@@ -488,14 +488,3 @@ class _TokoProdukPageState extends State<TokoProdukPage> {
     );
   }
 }
-
-// NOTE: This file assumes your ApiService provides the following methods (used above):
-// - getProdukToko(token)
-// - hapusProduk(token, id)
-// - getCategories()
-// - getProductDetail(id)
-// - saveProductMultipart(fields, imageFile: File)
-// - saveProductJson(fields)
-// - Possibly ApiException class for nicer errors.
-// If your ApiService uses different method names or signatures, adapt the calls
-// accordingly.
