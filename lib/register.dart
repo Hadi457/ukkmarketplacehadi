@@ -17,13 +17,11 @@ class _RegisterPageState extends State<RegisterPage> {
   bool _loading = false;
   final ApiService _api = ApiService();
 
-  // map untuk menyimpan pesan error per field (key sesuai nama field server)
   Map<String, String?> _fieldErrors = {};
 
   @override
   void initState() {
     super.initState();
-    // clear field-specific error saat user mengetik
     _nameCtr.addListener(() {
       if (_fieldErrors.containsKey('nama')) setState(() => _fieldErrors.remove('nama'));
     });
@@ -34,10 +32,12 @@ class _RegisterPageState extends State<RegisterPage> {
       if (_fieldErrors.containsKey('password')) setState(() => _fieldErrors.remove('password'));
     });
     _contactCtr.addListener(() {
-      if (_fieldErrors.containsKey('kontak') || _fieldErrors.containsKey('contact')) setState(() {
-        _fieldErrors.remove('kontak');
-        _fieldErrors.remove('contact');
-      });
+      if (_fieldErrors.containsKey('kontak') || _fieldErrors.containsKey('contact')) {
+        setState(() {
+          _fieldErrors.remove('kontak');
+          _fieldErrors.remove('contact');
+        });
+      }
     });
   }
 
@@ -74,20 +74,18 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Future<void> _register() async {
-    // reset previous field errors
     setState(() => _fieldErrors.clear());
 
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
     try {
-      final res = await _api.register(
+      await _api.register(
         name: _nameCtr.text.trim(),
         username: _usernameCtr.text.trim(),
         password: _passwordCtr.text,
         contact: _contactCtr.text.trim().isEmpty ? null : _contactCtr.text.trim(),
       );
 
-      // sukses
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Registrasi berhasil. Silakan login.')));
         Navigator.pop(context);
@@ -95,21 +93,16 @@ class _RegisterPageState extends State<RegisterPage> {
     } catch (e) {
       String message = 'Register error: $e';
 
-      // Gunakan tipe ApiException yang didefinisikan di ApiService (jika ada)
       if (e is ApiException) {
-        // pakai message dari ApiException jika tersedia
         if (e.message != null && e.message.isNotEmpty) {
           message = e.message;
         }
 
-        // mapping field-specific errors (jika server mengembalikan errors)
         if (e.errors != null) {
           final Map<String, String?> mapped = {};
           try {
-            // e.errors diasumsikan Map<String, dynamic> atau Map
             final errorsMap = Map<String, dynamic>.from(e.errors as Map);
             errorsMap.forEach((key, value) {
-              // value bisa List atau String atau lainnya
               if (value is List) {
                 mapped[key.toString()] = value.join(' ');
               } else {
@@ -117,7 +110,6 @@ class _RegisterPageState extends State<RegisterPage> {
               }
             });
           } catch (_) {
-            // fallback: coba konversi sederhana
             try {
               mapped.addAll({'error': e.errors.toString()});
             } catch (_) {}
@@ -162,7 +154,6 @@ class _RegisterPageState extends State<RegisterPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // header/brand
                   Container(
                     height: 84,
                     decoration: BoxDecoration(
@@ -181,7 +172,6 @@ class _RegisterPageState extends State<RegisterPage> {
                     ),
                   ),
                   const SizedBox(height: 22),
-
                   Container(
                     padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
@@ -230,15 +220,14 @@ class _RegisterPageState extends State<RegisterPage> {
                             keyboardType: TextInputType.phone,
                           ),
                           const SizedBox(height: 18),
-
                           SizedBox(
                             width: double.infinity,
                             height: 48,
                             child: ElevatedButton(
                               onPressed: _loading ? null : _register,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.white, // putih
-                                foregroundColor: Colors.black, // teks gelap
+                                backgroundColor: Colors.white,
+                                foregroundColor: Colors.black,
                                 elevation: 2,
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                 textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
@@ -252,7 +241,6 @@ class _RegisterPageState extends State<RegisterPage> {
                       ),
                     ),
                   ),
-
                   const SizedBox(height: 16),
                   const Center(child: Text('Isi data untuk membuat akun', style: TextStyle(color: Colors.white54))),
                 ],

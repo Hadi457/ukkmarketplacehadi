@@ -20,7 +20,6 @@ class _ProfilePageState extends State<ProfilePage> {
   bool _loading = true;
   bool _saving = false;
 
-  // optional: store field-specific errors returned from server
   Map<String, String?> _fieldErrors = {};
 
   @override
@@ -28,7 +27,6 @@ class _ProfilePageState extends State<ProfilePage> {
     super.initState();
     _loadProfile();
 
-    // clear field-specific error saat user mengetik
     _nameCtr.addListener(() {
       if (_fieldErrors.containsKey('nama')) setState(() => _fieldErrors.remove('nama'));
     });
@@ -36,10 +34,12 @@ class _ProfilePageState extends State<ProfilePage> {
       if (_fieldErrors.containsKey('username')) setState(() => _fieldErrors.remove('username'));
     });
     _contactCtr.addListener(() {
-      if (_fieldErrors.containsKey('kontak') || _fieldErrors.containsKey('contact')) setState(() {
-        _fieldErrors.remove('kontak');
-        _fieldErrors.remove('contact');
-      });
+      if (_fieldErrors.containsKey('kontak') || _fieldErrors.containsKey('contact')) {
+        setState(() {
+          _fieldErrors.remove('kontak');
+          _fieldErrors.remove('contact');
+        });
+      }
     });
   }
 
@@ -82,9 +82,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
     try {
       final res = await _api.getProfile();
-      if (res == null) {
-        // nothing
-      } else if (res is Map && res.containsKey('data')) {
+      if (res is Map && res.containsKey('data')) {
         final data = res['data'];
         if (data is Map) _applyProfileData(Map<String, dynamic>.from(data));
       } else if (res is Map && res.containsKey('user')) {
@@ -92,8 +90,6 @@ class _ProfilePageState extends State<ProfilePage> {
         if (data is Map) _applyProfileData(Map<String, dynamic>.from(data));
       } else if (res is Map) {
         _applyProfileData(Map<String, dynamic>.from(res));
-      } else {
-        // fallback: do nothing
       }
     } catch (e) {
       if (mounted) {
@@ -105,7 +101,6 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   void _applyProfileData(Map<String, dynamic> data) {
-    // mencoba beberapa nama field umum dari API
     _nameCtr.text = (data['name'] ?? data['nama'] ?? data['nama_lengkap'] ?? '').toString();
     _usernameCtr.text = (data['username'] ?? data['user_name'] ?? '').toString();
     _contactCtr.text = (data['contact'] ?? data['no_hp'] ?? data['kontak'] ?? data['telepon'] ?? '').toString();
@@ -115,7 +110,6 @@ class _ProfilePageState extends State<ProfilePage> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
 
-    // debug token
     final token = await _api.getToken();
     debugPrint('DEBUG: token before updateProfile -> $token');
 
@@ -137,15 +131,13 @@ class _ProfilePageState extends State<ProfilePage> {
     };
 
     try {
-      final res = await _api.updateProfile(body);
+      await _api.updateProfile(body);
 
-      // jika server mengembalikan errors, tangani di bawah (mis: ApiException)
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profil berhasil diperbarui')));
         await _loadProfile();
       }
     } catch (e) {
-      // jika ApiException dengan struktur errors tersedia, ambil detailnya
       String message = 'Gagal memperbarui profil: $e';
       try {
         if (e is ApiException) {
@@ -167,10 +159,7 @@ class _ProfilePageState extends State<ProfilePage> {
             setState(() => _fieldErrors = mapped);
           }
         }
-      } catch (_) {
-        // ignore mapping error
-      }
-
+      } catch (_) {}
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -195,9 +184,9 @@ class _ProfilePageState extends State<ProfilePage> {
     setState(() => _loading = true);
     try {
       try {
-        await _api.logout(); // jika tersedia
+        await _api.logout();
       } catch (_) {
-        await _api.removeToken(); // fallback: hapus token lokal
+        await _api.removeToken();
       }
 
       if (mounted) {
@@ -212,7 +201,8 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Widget _buildAvatar() {
     final name = _nameCtr.text.trim();
-    final initials = name.isNotEmpty ? name.split(' ').map((s) => s.isNotEmpty ? s[0] : '').take(2).join().toUpperCase() : 'U';
+    final initials =
+        name.isNotEmpty ? name.split(' ').map((s) => s.isNotEmpty ? s[0] : '').take(2).join().toUpperCase() : 'U';
     return CircleAvatar(
       radius: 44,
       backgroundColor: Colors.white12,
@@ -249,8 +239,6 @@ class _ProfilePageState extends State<ProfilePage> {
                       const SizedBox(height: 8),
                       _buildAvatar(),
                       const SizedBox(height: 14),
-
-                      // Card-like container
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
@@ -270,14 +258,16 @@ class _ProfilePageState extends State<ProfilePage> {
                             TextFormField(
                               controller: _usernameCtr,
                               style: const TextStyle(color: Colors.white),
-                              decoration: _inputDecoration('Username', Icons.account_circle, errorText: _fieldErrors['username']),
+                              decoration:
+                                  _inputDecoration('Username', Icons.account_circle, errorText: _fieldErrors['username']),
                               validator: (v) => v == null || v.trim().isEmpty ? 'Masukkan username' : null,
                             ),
                             const SizedBox(height: 12),
                             TextFormField(
                               controller: _contactCtr,
                               style: const TextStyle(color: Colors.white),
-                              decoration: _inputDecoration('Kontak / WhatsApp', Icons.phone, errorText: _fieldErrors['kontak'] ?? _fieldErrors['contact']),
+                              decoration: _inputDecoration(
+                                  'Kontak / WhatsApp', Icons.phone, errorText: _fieldErrors['kontak'] ?? _fieldErrors['contact']),
                               keyboardType: TextInputType.phone,
                             ),
                             const SizedBox(height: 16),
@@ -287,8 +277,11 @@ class _ProfilePageState extends State<ProfilePage> {
                                   child: ElevatedButton.icon(
                                     onPressed: _saving ? null : _saveProfile,
                                     icon: _saving
-                                        ? const SizedBox(width: 16, height: 16,
-                                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+                                        ? const SizedBox(
+                                            width: 16,
+                                            height: 16,
+                                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                                          )
                                         : const Icon(Icons.save, color: Colors.black),
                                     label: const Text('Simpan Perubahan'),
                                     style: ElevatedButton.styleFrom(
@@ -299,9 +292,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                     ),
                                   ),
                                 ),
-
                                 const SizedBox(width: 12),
-
                                 Expanded(
                                   child: OutlinedButton.icon(
                                     onPressed: _logout,
@@ -320,7 +311,6 @@ class _ProfilePageState extends State<ProfilePage> {
                           ],
                         ),
                       ),
-
                       const SizedBox(height: 18),
                       const Text('Perbarui informasi profil Anda.', style: TextStyle(color: Colors.white54)),
                     ],
