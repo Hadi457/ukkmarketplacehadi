@@ -1,6 +1,4 @@
-// lib/pages/my_store_page.dart
 import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:marketplacedesign/api_service.dart';
@@ -150,11 +148,43 @@ class _MyStorePageState extends State<MyStorePage> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Hapus Toko'),
-        content: const Text('Apakah kamu yakin ingin menghapus toko ini?'),
+        backgroundColor: Colors.black,
+        title: const Text('Hapus Toko', style: TextStyle(color: Colors.white),),
+        content: const Text('Apakah kamu yakin ingin menghapus toko ini?', style: TextStyle(color: Colors.white),),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Batal')),
-          TextButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Hapus')),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.white30),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: const Text('Batal'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton(
+                  onPressed: () => Navigator.pop(dialogContext, true),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.redAccent,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: const Text('Hapus'),
+                ),
+              ),
+            ],
+          )
         ],
       ),
     );

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:marketplacedesign/bottomnav.dart';
-import 'package:marketplacedesign/home.dart';
 import 'package:marketplacedesign/login.dart';
 import 'package:marketplacedesign/register.dart';
 import 'package:shared_preferences/shared_preferences.dart';

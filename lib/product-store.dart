@@ -4,11 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:marketplacedesign/api_service.dart';
 
-// Converted TokoProdukPage: make the "tampilan-baru" behave/look like the
-// "tampilan-lama". This file keeps the token parameter (for authenticated
-// APIs) and reuses patterns from the older UI: refresh, pagination, categories,
-// product form (add/edit), image picker, delete confirmation.
-
+// Halaman untuk menampilkan dan mengelola produk toko
 class TokoProdukPage extends StatefulWidget {
   final String token;
 
@@ -21,35 +17,41 @@ class TokoProdukPage extends StatefulWidget {
 class _TokoProdukPageState extends State<TokoProdukPage> {
   final ApiService _api = ApiService();
 
+  // State loading utama saat inisialisasi
   bool _loading = true;
+  // State saat proses refresh
   bool _refreshing = false;
+  // List produk yang ditampilkan
   List<dynamic> _products = [];
   int _page = 1;
   int _lastPage = 1;
 
-  // categories for dropdown
+  // Kategori untuk dropdown
   List<Map<String, dynamic>> _categories = [];
   int? _selectedCategoryId;
 
   @override
   void initState() {
     super.initState();
+    // Panggil inisialisasi data saat widget dibuat
     _initData();
   }
 
+  // Fungsi inisialisasi: muat kategori lalu produk
   Future<void> _initData() async {
     setState(() => _loading = true);
     try {
       await _loadCategories();
       await _loadProducts(page: 1);
     } catch (e) {
-      // if categories fail, still try products
+      // Jika gagal memuat kategori, tetap coba muat produk
       await _loadProducts(page: 1);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
+  // Muat daftar kategori dari API
   Future<void> _loadCategories() async {
     try {
       final res = await _api.getCategories();
@@ -66,20 +68,20 @@ class _TokoProdukPageState extends State<TokoProdukPage> {
       }
       if (mounted) setState(() => _categories = cats);
     } catch (e) {
-      // ignore errors for categories for now
+      // Abaikan error kategori untuk sementara
     }
   }
 
+  // Muat daftar produk dari API (menggunakan token toko jika diperlukan)
   Future<void> _loadProducts({int page = 1}) async {
     setState(() {
       if (page == 1) _loading = true;
       _refreshing = true;
     });
     try {
-      // Use the store-specific API which expects token
+      // Gunakan API khusus toko yang menerima token
       final res = await ApiService.getProdukToko(widget.token);
 
-      // Adapt to multiple shapes: the old API returned { success:true, data: { produk: [...] } }
       List<dynamic> items = [];
       int currentPage = page;
       int lastPage = 1;
@@ -94,7 +96,7 @@ class _TokoProdukPageState extends State<TokoProdukPage> {
           items = List.from(data);
         }
 
-        // try to read pagination if present
+        // Coba baca informasi pagination jika ada
         final pagination = res['pagination'] ?? res['meta'] ?? data['pagination'] ?? data['meta'];
         if (pagination is Map) {
           currentPage = (pagination['current_page'] is int) ? pagination['current_page'] : currentPage;
@@ -124,6 +126,7 @@ class _TokoProdukPageState extends State<TokoProdukPage> {
     }
   }
 
+  // Hapus produk dengan konfirmasi dialog
   Future<void> _deleteProduct(int id) async {
     final ok = await showDialog<bool>(
       context: context,
@@ -132,8 +135,39 @@ class _TokoProdukPageState extends State<TokoProdukPage> {
         title: const Text('Hapus Produk', style: TextStyle(color: Colors.white)),
         content: const Text('Yakin ingin menghapus produk ini?', style: TextStyle(color: Colors.white70)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Batal')),
-          TextButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Hapus', style: TextStyle(color: Colors.redAccent))),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.white30),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: const Text('Batal'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton(
+                  onPressed: () => Navigator.pop(dialogContext, true),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.redAccent,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: const Text('Hapus'),
+                ),
+              ),
+            ],
+          )
         ],
       ),
     );
@@ -141,7 +175,6 @@ class _TokoProdukPageState extends State<TokoProdukPage> {
     if (ok != true) return;
 
     try {
-      // use token-aware delete if available
       final res = await ApiService.hapusProduk(widget.token, id);
       String msg = 'Produk dihapus';
       if (res is Map && res.containsKey('message')) msg = res['message'].toString();
@@ -155,6 +188,7 @@ class _TokoProdukPageState extends State<TokoProdukPage> {
     }
   }
 
+  // Tampilkan form tambah / edit produk menggunakan modal bottom sheet
   Future<void> _showProductForm({Map<String, dynamic>? product}) async {
     final isEdit = product != null;
     final _formKey = GlobalKey<FormState>();
@@ -163,6 +197,7 @@ class _TokoProdukPageState extends State<TokoProdukPage> {
     final stokCtr = TextEditingController(text: isEdit ? (product!['stok']?.toString() ?? product['stock']?.toString() ?? '') : '');
     final descCtr = TextEditingController(text: isEdit ? (product!['deskripsi'] ?? product['description'] ?? '') : '');
 
+    // Coba ambil id kategori dari berbagai kemungkinan nama field
     int? formSelectedCategoryId = isEdit
         ? (product!['id_kategori'] ?? product['category_id'] ?? product['idKategori'] ?? product['kategori_id'])
             ?.toString()
@@ -174,13 +209,14 @@ class _TokoProdukPageState extends State<TokoProdukPage> {
     File? _imageFile;
     String? _imagePreviewUrl = isEdit ? (product!['gambar'] ?? product['image'] ?? product['url_image'])?.toString() : null;
 
+    // Fungsi untuk memilih gambar dari gallery atau kamera
     Future<void> _pickImage(ImageSource source) async {
       try {
         final picker = ImagePicker();
         final xfile = await picker.pickImage(source: source, maxWidth: 1200, maxHeight: 1200, imageQuality: 80);
         if (xfile != null) {
           _imageFile = File(xfile.path);
-          _imagePreviewUrl = null;
+          _imagePreviewUrl = null; // reset preview url jika ada file baru
         }
       } catch (e) {
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal memilih gambar: $e')));
@@ -196,6 +232,7 @@ class _TokoProdukPageState extends State<TokoProdukPage> {
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(12))),
       builder: (ctx) {
         return StatefulBuilder(builder: (ctx2, setStateSB) {
+          // Fungsi simpan produk (multipart jika ada gambar, json jika tidak)
           Future<void> _save() async {
             if (!_formKey.currentState!.validate()) return;
             setStateSB(() => _saving = true);
@@ -215,8 +252,6 @@ class _TokoProdukPageState extends State<TokoProdukPage> {
             }
 
             try {
-              // NOTE: adapt these calls to your ApiService signatures. If your
-              // ApiService requires token for save, update the methods accordingly.
               if (_imageFile != null) {
                 await _api.saveProductMultipart(fields, imageFile: _imageFile);
               } else {
@@ -225,7 +260,7 @@ class _TokoProdukPageState extends State<TokoProdukPage> {
 
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(isEdit ? 'Produk diperbarui' : 'Produk ditambahkan')));
-                Navigator.pop(ctx); // close sheet
+                Navigator.pop(ctx); // tutup sheet
                 await _loadProducts(page: 1);
               }
             } catch (e) {
@@ -245,6 +280,7 @@ class _TokoProdukPageState extends State<TokoProdukPage> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    // Header sheet
                     Row(
                       children: [
                         Expanded(child: Text(isEdit ? 'Edit Produk' : 'Tambah Produk', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white))),
@@ -258,7 +294,7 @@ class _TokoProdukPageState extends State<TokoProdukPage> {
                         children: [
                           Row(
                             children: [
-                              // preview
+                              // Preview gambar
                               Container(
                                 width: 110,
                                 height: 110,
@@ -280,7 +316,7 @@ class _TokoProdukPageState extends State<TokoProdukPage> {
                                       decoration: _inputDecoration('Nama Produk'),
                                       validator: (v) => v == null || v.trim().isEmpty ? 'Masukkan nama produk' : null,
                                     ),
-                                    const SizedBox(height: 6),
+                                    const SizedBox(height: 13),
                                     Row(
                                       children: [
                                         ElevatedButton.icon(
@@ -326,6 +362,7 @@ class _TokoProdukPageState extends State<TokoProdukPage> {
                           ),
                           const SizedBox(height: 12),
 
+                          // Dropdown kategori (menggunakan daftar _categories)
                           DropdownButtonFormField<int>(
                             value: formSelectedCategoryId,
                             items: _categories.map((c) {
@@ -334,14 +371,14 @@ class _TokoProdukPageState extends State<TokoProdukPage> {
                               if (id == null) return null;
                               return DropdownMenuItem<int>(
                                 value: int.tryParse(id),
-                                child: Text(name),
+                                child: Text(name, style: TextStyle(color: Colors.white),),
                               );
                             }).whereType<DropdownMenuItem<int>>().toList(),
                             onChanged: (v) => setStateSB(() => formSelectedCategoryId = v),
                             decoration: _inputDecoration('Kategori'),
-                            dropdownColor: Colors.white,
+                            dropdownColor: Colors.black,
                             validator: (v) {
-                              return null;
+                              return null; // Tidak wajib, bisa disesuaikan jika diperlukan
                             },
                           ),
 
@@ -381,6 +418,7 @@ class _TokoProdukPageState extends State<TokoProdukPage> {
     );
   }
 
+  // Bangun widget item produk untuk ListView
   Widget _buildProductItem(dynamic p) {
     final id = p['id'] ?? p['id_produk'] ?? p['id_product'];
     final name = p['nama_produk'] ?? p['name'] ?? '';
@@ -431,6 +469,7 @@ class _TokoProdukPageState extends State<TokoProdukPage> {
     );
   }
 
+  // Dekorasi input yang konsisten
   InputDecoration _inputDecoration(String label) {
     return InputDecoration(
       labelText: label,

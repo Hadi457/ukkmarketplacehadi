@@ -1,4 +1,3 @@
-// lib/pages/profile_page.dart
 import 'package:flutter/material.dart';
 import 'package:marketplacedesign/api_service.dart';
 import 'package:marketplacedesign/login.dart';

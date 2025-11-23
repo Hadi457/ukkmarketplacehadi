@@ -1,6 +1,4 @@
-// lib/pages/product_detail_page.dart
 import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:marketplacedesign/api_service.dart';
 import 'package:image_picker/image_picker.dart';
@@ -18,7 +16,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
 
   bool _loading = true;
   Map<String, dynamic>? _product;
-  bool _saving = false;
 
   @override
   void initState() {
