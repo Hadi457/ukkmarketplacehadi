@@ -107,7 +107,6 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Use a constrained width so it looks good on larger screens
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
@@ -126,7 +125,6 @@ class _LoginPageState extends State<LoginPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Minimal logo / brand marker
                   Container(
                     height: 92,
                     decoration: BoxDecoration(
@@ -148,8 +146,6 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
                   const SizedBox(height: 28),
-
-                  // Card-like area
                   Container(
                     padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
@@ -176,16 +172,14 @@ class _LoginPageState extends State<LoginPage> {
                             validator: (v) => v == null || v.isEmpty ? 'Masukkan password' : null,
                           ),
                           const SizedBox(height: 18),
-
-                          // Login button
                           SizedBox(
                             width: double.infinity,
                             height: 50,
                             child: ElevatedButton(
                               onPressed: _loading ? null : _login,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.white, // putih
-                                foregroundColor: Colors.black, // teks gelap
+                                backgroundColor: Colors.white,
+                                foregroundColor: Colors.black,
                                 elevation: 2,
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                 textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
@@ -195,10 +189,7 @@ class _LoginPageState extends State<LoginPage> {
                                   : const Text('Login'),
                             ),
                           ),
-
                           const SizedBox(height: 12),
-
-                          // secondary action
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
@@ -217,10 +208,7 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                     ),
                   ),
-
                   const SizedBox(height: 18),
-
-                  // small footer / tip
                   const Center(
                     child: Text('Masuk untuk mengelola toko dan produk Anda', style: TextStyle(color: Colors.white54)),
                   ),

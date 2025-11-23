@@ -1,10 +1,9 @@
-// lib/bottomnav.dart
 import 'package:flutter/material.dart';
 import 'package:marketplacedesign/home.dart';
 import 'package:marketplacedesign/my_store.dart';
-import 'package:marketplacedesign/product-store.dart'; // pastikan TokoProdukPage ada di file ini
+import 'package:marketplacedesign/product-store.dart';
 import 'package:marketplacedesign/profile.dart';
-import 'package:marketplacedesign/api_service.dart'; // untuk ambil token
+import 'package:marketplacedesign/api_service.dart';
 
 class BottomNav extends StatelessWidget {
   const BottomNav({super.key});
@@ -27,17 +26,14 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _token;
   bool _loadingToken = true;
 
-  // _pages tidak const lagi karena kita akan mengganti halaman ke-2 secara dinamis
   late List<Widget> _pages;
 
   @override
   void initState() {
     super.initState();
 
-    // inisialisasi sementara pages — agar app tidak crash sebelum token di-load
     _pages = [
       const HomePage(),
-      // placeholder loading sebelum token tersedia
       const Center(child: CircularProgressIndicator()),
       const MyStorePage(),
       const ProfilePage(),
@@ -49,7 +45,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _initToken() async {
     try {
       final token = await ApiService().getToken();
-      // jika token null atau empty, tampilkan pesan agar user login
       setState(() {
         _token = token;
         _loadingToken = false;
@@ -57,20 +52,20 @@ class _HomeScreenState extends State<HomeScreen> {
         _pages = [
           const HomePage(),
           if (token == null || token.isEmpty)
-            // jika belum login, tampilkan instruksi
-            const Center(child: Padding(
-              padding: EdgeInsets.all(16.0),
-              child: Text('Silakan login untuk melihat produk toko', textAlign: TextAlign.center),
-            ))
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Text('Silakan login untuk melihat produk toko',
+                    textAlign: TextAlign.center),
+              ),
+            )
           else
-            // kalau token ada, pass ke TokoProdukPage
             TokoProdukPage(token: token),
           const MyStorePage(),
           const ProfilePage(),
         ];
       });
     } catch (e) {
-      // fallback: tampilkan error text di tab toko
       setState(() {
         _loadingToken = false;
         _pages = [
@@ -91,7 +86,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // selama token sedang di-load, jika user memilih tab ke-2 tetap tampilkan loading
     final body = _pages[_selectedIndex];
 
     return Scaffold(

@@ -26,7 +26,6 @@ class MyApp extends StatelessWidget {
           );
         }
 
-        // fallback jika route tidak dikenali
         return MaterialPageRoute(
           builder: (context) => const LoginPage(),
         );
@@ -74,12 +73,9 @@ class _LaunchPageState extends State<LaunchPage> {
     }
 
     if (_loggedIn) {
-      // arahkan ke '/home' setelah build selesai
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        // pastikan tidak memanggil berkali-kali (hanya replace sekali)
         Navigator.pushReplacementNamed(context, '/home');
       });
-      // sementara tampilkan scaffold kosong (akan segera digantikan oleh route)
       return const Scaffold();
     }
 

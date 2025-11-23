@@ -1,9 +1,7 @@
-// lib/home_page.dart (ganti/replace file HomePage Anda dengan ini)
 import 'package:flutter/material.dart';
 import 'package:marketplacedesign/api_service.dart';
 import 'package:marketplacedesign/detail-product.dart';
 
-// Halaman utama (Home) yang menampilkan daftar produk dan kategori
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -13,29 +11,21 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final ApiService _api = ApiService();
-  // Indikator loading saat memuat data
   bool _loading = true;
-  // List produk yang diterima dari API
   List<dynamic> _products = [];
-  // List kategori yang diterima dari API
   List<dynamic> _categories = [];
-  // Query pencarian (kata kunci)
   String _query = '';
-  // Kategori yang dipilih; null berarti "Semua"
-  int? _selectedCategoryId; // null berarti "Semua"
+  int? _selectedCategoryId;
 
   @override
   void initState() {
     super.initState();
-    // Muat kategori dan produk saat widget siap
     _loadCategoriesAndProducts();
   }
 
-  // Fungsi untuk memuat kategori dan produk sekaligus
   Future<void> _loadCategoriesAndProducts() async {
     setState(() => _loading = true);
     try {
-      // Ambil kategori dari API
       final catRes = await _api.getCategories();
       if (catRes is List) {
         _categories = List.from(catRes);
@@ -45,11 +35,9 @@ class _HomePageState extends State<HomePage> {
         _categories = [];
       }
 
-      // Muat produk (initial load: semua)
-      await _loadProducts(); // tanpa categoryId => semua
+      await _loadProducts();
     } catch (e) {
       if (mounted) {
-        // Tampilkan pesan error jika gagal
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Load error: $e')));
         _categories = [];
         _products = [];
@@ -59,11 +47,9 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  // Fungsi untuk memuat produk; bisa dipanggil dengan categoryId atau keyword
   Future<void> _loadProducts({int? categoryId, String? keyword}) async {
     setState(() => _loading = true);
     try {
-      // Jika endpoint memerlukan token, set auth: true. Default false.
       final res = await _api.getProducts(
         page: 1,
         keyword: keyword ?? (_query.isEmpty ? null : _query),
@@ -89,7 +75,6 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  // Handler saat memilih kategori (null => semua)
   Future<void> _onSelectCategory(int? id) async {
     setState(() {
       _selectedCategoryId = id;
@@ -97,11 +82,9 @@ class _HomePageState extends State<HomePage> {
     await _loadProducts(categoryId: id);
   }
 
-  // Gabungan filter: kategori (client-side fallback) + search lokal
   List<dynamic> _filteredProductsByCategoryAndSearch() {
     List<dynamic> list = List.from(_products);
 
-    // Filter kategori lokal jika kategori dipilih
     if (_selectedCategoryId != null) {
       list = list.where((p) {
         final catId = p['id_kategori'] ?? p['category_id'] ?? p['id_category'] ?? p['kategori_id'] ?? p['idCategory'];
@@ -110,7 +93,6 @@ class _HomePageState extends State<HomePage> {
       }).toList();
     }
 
-    // Filter search lokal
     if (_query.trim().isNotEmpty) {
       final q = _query.toLowerCase();
       list = list.where((p) {
@@ -123,7 +105,6 @@ class _HomePageState extends State<HomePage> {
     return list;
   }
 
-  // Format harga sederhana ke format Rupiah (contoh: 1000000 -> Rp 1.000.000)
   String _formatPrice(dynamic price) {
     try {
       if (price == null) return '';
@@ -142,7 +123,6 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    // Gunakan hasil filter (kategori + search) sebagai daftar yang akan ditampilkan
     final items = _filteredProductsByCategoryAndSearch();
 
     return Scaffold(
@@ -155,7 +135,6 @@ class _HomePageState extends State<HomePage> {
           preferredSize: const Size.fromHeight(110),
           child: Column(
             children: [
-              // Kotak pencarian
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 child: Container(
@@ -181,8 +160,6 @@ class _HomePageState extends State<HomePage> {
                           ),
                           onChanged: (v) {
                             setState(() => _query = v);
-                            // Lakukan pencarian server-side saat user mengetik (opsional)
-                            // Jika ingin debounce, tambahkan mekanisme debounce.
                             _loadProducts(categoryId: _selectedCategoryId);
                           },
                         ),
@@ -199,8 +176,6 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
               ),
-
-              // List kategori (horizontal chips)
               SizedBox(
                 height: 48,
                 child: _categories.isEmpty
@@ -219,10 +194,8 @@ class _HomePageState extends State<HomePage> {
                           scrollDirection: Axis.horizontal,
                           children: [
                             const SizedBox(width: 4),
-                            // Chip untuk "Semua"
                             _buildCategoryChip(null, 'Semua'),
                             const SizedBox(width: 8),
-                            // Map kategori dari API; asumsi setiap item punya id dan nama (id / id_kategori, nama / nama_kategori)
                             for (var c in _categories) ...[
                               _buildCategoryChip(
                                 c['id'] ?? c['id_kategori'] ?? c['id_category'],
@@ -239,7 +212,6 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
       ),
-
       body: RefreshIndicator(
         onRefresh: () => _loadProducts(categoryId: _selectedCategoryId),
         edgeOffset: 16,
@@ -285,7 +257,6 @@ class _HomePageState extends State<HomePage> {
                         child: InkWell(
                           borderRadius: BorderRadius.circular(12),
                           onTap: () {
-                            // Buka halaman detail produk saat ditekan
                             final idVal = (p['id'] ?? p['id_produk'] ?? p['id_product']);
                             if (idVal == null) {
                               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ID produk tidak tersedia')));
@@ -393,7 +364,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // Helper untuk membuat chip kategori
   Widget _buildCategoryChip(dynamic idVal, String label) {
     final int? id = idVal == null ? null : (int.tryParse(idVal.toString()) ?? null);
     final selected = _selectedCategoryId == id;
@@ -414,7 +384,6 @@ class _HomePageState extends State<HomePage> {
               const SizedBox(width: 6),
               GestureDetector(
                 onTap: () {
-                  // Bersihkan pilihan kategori
                   _onSelectCategory(null);
                 },
                 child: const Icon(Icons.close, size: 16, color: Colors.white70),

@@ -1,6 +1,4 @@
-// lib/toko_produk_page.dart  (ganti file lama dengan ini)
 import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:marketplacedesign/api_service.dart';
@@ -17,14 +15,14 @@ class TokoProdukPage extends StatefulWidget {
 class _TokoProdukPageState extends State<TokoProdukPage> {
   final ApiService _api = ApiService();
 
-  bool _loading = true;
-  bool _refreshing = false;
+  bool loading = true;
+  bool refreshing = false;
   List<dynamic> _products = [];
-  int _page = 1;
-  int _lastPage = 1;
+  int page = 1;
+  int lastPage = 1;
 
   List<Map<String, dynamic>> _categories = [];
-  int? _selectedCategoryId;
+  int? selectedCategoryId;
 
   @override
   void initState() {
@@ -33,14 +31,14 @@ class _TokoProdukPageState extends State<TokoProdukPage> {
   }
 
   Future<void> _initData() async {
-    setState(() => _loading = true);
+    setState(() => loading = true);
     try {
       await _loadCategories();
       await _loadProducts(page: 1);
     } catch (e) {
       await _loadProducts(page: 1);
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) setState(() => loading = false);
     }
   }
 
@@ -59,22 +57,20 @@ class _TokoProdukPageState extends State<TokoProdukPage> {
         cats = [Map<String, dynamic>.from(res)];
       }
       if (mounted) setState(() => _categories = cats);
-    } catch (e) {
-      // ignore
-    }
+    } catch (e) {}
   }
 
   Future<void> _loadProducts({int page = 1}) async {
     setState(() {
-      if (page == 1) _loading = true;
-      _refreshing = true;
+      if (page == 1) loading = true;
+      refreshing = true;
     });
     try {
       final res = await ApiService.getProdukToko(widget.token);
 
       List<dynamic> items = [];
       int currentPage = page;
-      int lastPage = 1;
+      int lastPageLocal = 1;
 
       if (res == null) {
         items = [];
@@ -89,12 +85,12 @@ class _TokoProdukPageState extends State<TokoProdukPage> {
         final pagination = res['pagination'] ?? res['meta'] ?? (data is Map ? (data['pagination'] ?? data['meta']) : null);
         if (pagination is Map) {
           currentPage = (pagination['current_page'] is int) ? pagination['current_page'] : currentPage;
-          lastPage = (pagination['last_page'] is int) ? pagination['last_page'] : lastPage;
+          lastPageLocal = (pagination['last_page'] is int) ? pagination['last_page'] : lastPageLocal;
         }
       } else if (res is List) {
         items = List.from(res);
         currentPage = page;
-        lastPage = 1;
+        lastPageLocal = 1;
       } else {
         items = [];
       }
@@ -102,8 +98,8 @@ class _TokoProdukPageState extends State<TokoProdukPage> {
       if (mounted) {
         setState(() {
           _products = items;
-          _page = currentPage;
-          _lastPage = lastPage;
+          this.page = currentPage;
+          lastPage = lastPageLocal;
         });
       }
     } catch (e) {
@@ -111,7 +107,7 @@ class _TokoProdukPageState extends State<TokoProdukPage> {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal memuat produk: $e')));
       }
     } finally {
-      if (mounted) setState(() => {_loading = false, _refreshing = false});
+      if (mounted) setState(() => {loading = false, refreshing = false});
     }
   }
 
@@ -184,7 +180,6 @@ class _TokoProdukPageState extends State<TokoProdukPage> {
     final stokCtr = TextEditingController(text: isEdit ? (product!['stok']?.toString() ?? product['stock']?.toString() ?? '') : '');
     final descCtr = TextEditingController(text: isEdit ? (product!['deskripsi'] ?? product['description'] ?? '') : '');
 
-    // Perbaikan parsing id kategori dari berbagai nama field
     int? formSelectedCategoryId;
     if (isEdit) {
       dynamic rawCat = product!['id_kategori'] ?? product['category_id'] ?? product['idKategori'] ?? product['kategori_id'] ?? product['kategori'] ?? product['category'];
@@ -223,7 +218,6 @@ class _TokoProdukPageState extends State<TokoProdukPage> {
             if (!_formKey.currentState!.validate()) return;
             setStateSB(() => _saving = true);
 
-            // Build fields
             final fields = <String, String>{
               'nama_produk': nameCtr.text.trim(),
               'harga': priceCtr.text.trim(),
@@ -233,12 +227,10 @@ class _TokoProdukPageState extends State<TokoProdukPage> {
 
             if (formSelectedCategoryId != null) fields['id_kategori'] = formSelectedCategoryId.toString();
 
-            // Jika edit: sertakan beberapa variasi nama id agar backend mengenali update
             if (isEdit) {
               final idVal = product!['id'] ?? product['id_produk'] ?? product['id_product'] ?? product['produk_id'] ?? product['id'];
               if (idVal != null) {
                 final idStr = idVal.toString();
-                // sertakan beberapa key yang sering dipakai backend
                 fields['id'] = idStr;
                 fields['id_produk'] = idStr;
                 fields['id_product'] = idStr;
@@ -246,7 +238,6 @@ class _TokoProdukPageState extends State<TokoProdukPage> {
               }
             }
 
-            // Debug: print fields supaya bisa lihat apa yang dikirim
             debugPrint('saveProduct -> fields: $fields');
             if (_imageFile != null) debugPrint('saveProduct -> has image file: ${_imageFile!.path}');
 
@@ -262,7 +253,7 @@ class _TokoProdukPageState extends State<TokoProdukPage> {
 
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(isEdit ? 'Produk diperbarui' : 'Produk ditambahkan')));
-                Navigator.pop(ctx); // tutup sheet
+                Navigator.pop(ctx);
                 await _loadProducts(page: 1);
               }
             } catch (e) {
@@ -361,7 +352,6 @@ class _TokoProdukPageState extends State<TokoProdukPage> {
                             keyboardType: TextInputType.number,
                           ),
                           const SizedBox(height: 12),
-
                           DropdownButtonFormField<int>(
                             value: formSelectedCategoryId,
                             items: _categories.map((c) {
@@ -380,7 +370,6 @@ class _TokoProdukPageState extends State<TokoProdukPage> {
                               return null;
                             },
                           ),
-
                           const SizedBox(height: 12),
                           TextFormField(
                             controller: descCtr,
@@ -490,7 +479,7 @@ class _TokoProdukPageState extends State<TokoProdukPage> {
           IconButton(onPressed: () => _loadProducts(page: 1), icon: const Icon(Icons.refresh, color: Colors.white)),
         ],
       ),
-      body: _loading
+      body: loading
           ? const Center(child: CircularProgressIndicator(color: Colors.white))
           : RefreshIndicator(
               onRefresh: () => _loadProducts(page: 1),

@@ -1,5 +1,3 @@
-// Screenshot reference (for debugging): /mnt/data/fe947c4d-aa07-4f8a-a5b8-62357ebb60e1.png
-
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:marketplacedesign/api_service.dart';
@@ -20,7 +18,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   bool _loading = true;
   Map<String, dynamic>? _product;
 
-  // tambahan: resolved category name & store info
   String? _categoryName;
   Map<String, dynamic>? _storeInfo;
 
@@ -44,7 +41,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         _product = null;
       }
 
-      // resolve category name
       _categoryName = _extractCategoryName(_product);
       if (_categoryName == null) {
         final catId = _extractCategoryId(_product);
@@ -75,20 +71,15 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                 _categoryName = (match['nama_kategori'] ?? match['name'])?.toString();
               }
             }
-          } catch (_) {
-            // ignore, keep null
-          }
+          } catch (_) {}
         }
       }
 
-      // resolve store info
       _storeInfo = _extractStoreObject(_product);
       if (_storeInfo == null) {
         final storeId = _extractStoreId(_product);
         if (storeId != null) {
           try {
-            // WARNING: /stores may return only current user's stores (requires auth).
-            // If backend doesn't expose store by id, this may not find it.
             final storesRes = await _api.getStores();
             if (storesRes is Map && storesRes.containsKey('data')) {
               final list = storesRes['data'] as List;
@@ -110,9 +101,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
               );
               if (match.isNotEmpty) _storeInfo = Map<String, dynamic>.from(match);
             }
-          } catch (_) {
-            // ignore error (e.g., unauthorized), leave storeInfo null
-          }
+          } catch (_) {}
         }
       }
     } catch (e) {
@@ -125,7 +114,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     }
   }
 
-  // helper: try multiple field names for category name
   String? _extractCategoryName(Map<String, dynamic>? p) {
     if (p == null) return null;
     final candidates = ['kategori', 'category', 'nama_kategori', 'category_name', 'kategori_nama'];
@@ -133,7 +121,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       final v = p[k];
       if (v != null && v.toString().trim().isNotEmpty) return v.toString();
     }
-    // maybe product has nested kategori object
     final nested = p['kategori'] ?? p['category'];
     if (nested is Map && (nested['nama'] != null || nested['name'] != null)) {
       return (nested['nama'] ?? nested['name']).toString();
@@ -148,7 +135,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       final v = p[k];
       if (v != null && v.toString().trim().isNotEmpty) return v;
     }
-    // maybe nested
     final nested = p['kategori'] ?? p['category'];
     if (nested is Map && (nested['id'] != null)) return nested['id'];
     return null;
@@ -171,16 +157,12 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       final v = p[k];
       if (v != null && v.toString().trim().isNotEmpty) return v;
     }
-    // maybe nested toko object with id
     final nested = p['toko'] ?? p['store'];
     if (nested is Map && nested['id'] != null) return nested['id'];
     return null;
   }
 
-  // ---------- WhatsApp helpers ----------
-  /// Try to extract contact string from store object or product fields.
   String? _getStoreContact() {
-    // check store object first
     if (_storeInfo != null) {
       final candidates = ['kontak_toko', 'kontak', 'contact', 'phone', 'telepon', 'no_hp', 'no_telp', 'hp'];
       for (final k in candidates) {
@@ -188,7 +170,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         if (v != null && v.toString().trim().isNotEmpty) return v.toString();
       }
     }
-    // fallback to product-level fields
     final candidatesProduct = ['kontak_toko', 'kontak', 'contact', 'phone', 'telepon', 'no_hp', 'no_telp', 'hp', 'contact_toko', 'contact_store'];
     for (final k in candidatesProduct) {
       final v = _product?[k];
@@ -197,8 +178,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     return null;
   }
 
-  /// Clean phone for use in wa.me link. Returns digits only(without +).
-  /// Heuristics: remove non-digits, if starts with 0 replace with 62 (Indonesia).
   String _cleanPhoneForWhatsapp(String raw) {
     var digits = raw.replaceAll(RegExp(r'[^0-9+]'), '');
     if (digits.startsWith('+')) digits = digits.substring(1);
@@ -217,11 +196,9 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
 
     final encodedText = text == null ? null : Uri.encodeComponent(text);
 
-    // For web: always use wa.me (opens WhatsApp Web or prompt)
     final waWeb = 'https://wa.me/$cleaned${encodedText != null ? '?text=$encodedText' : ''}';
     final whatsappAppUri = Uri.parse('whatsapp://send?phone=$cleaned${encodedText != null ? '&text=$encodedText' : ''}');
 
-    // If running on web, open wa.me in new tab
     if (kIsWeb) {
       try {
         final ok = await launchUrlString(waWeb, webOnlyWindowName: '_blank');
@@ -234,14 +211,12 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       return;
     }
 
-    // Mobile/Desktop: try app first then web fallback
     try {
       if (await canLaunchUrl(whatsappAppUri)) {
         await launchUrl(whatsappAppUri, mode: LaunchMode.externalApplication);
         return;
       }
 
-      // fallback to wa.me web link
       final ok = await launchUrlString(waWeb, mode: LaunchMode.externalApplication);
       if (!ok) {
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tidak dapat membuka WhatsApp')));
@@ -308,7 +283,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                     ),
                   ),
                   const SizedBox(height: 18),
-                  // meta info (stok, kategori, toko)
                   if (_product != null)
                     Container(
                       padding: const EdgeInsets.all(14),
@@ -325,8 +299,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                             style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600),
                           ),
                           const SizedBox(height: 12),
-
-                          // Stok
                           Row(
                             children: [
                               const Icon(Icons.layers, color: Colors.white38, size: 18),
@@ -338,8 +310,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                             ],
                           ),
                           const SizedBox(height: 8),
-
-                          // Kategori
                           Row(
                             children: [
                               const Icon(Icons.category, color: Colors.white38, size: 18),
@@ -353,8 +323,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                             ],
                           ),
                           const SizedBox(height: 8),
-
-                          // Toko
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -366,8 +334,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                             ],
                           ),
                           const SizedBox(height: 14),
-
-                          // Tombol WA saja
                           Row(
                             children: [
                               Expanded(
@@ -397,7 +363,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                               ),
                             ],
                           ),
-
                           const SizedBox(height: 10),
                           if (storeContact != null && storeContact.trim().isNotEmpty)
                             Text(
@@ -413,7 +378,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     );
   }
   Widget _buildStoreWidget() {
-    // if we have full store object
     if (_storeInfo != null && _storeInfo!.isNotEmpty) {
       final name = _storeInfo!['nama_toko'] ?? _storeInfo!['nama'] ?? _storeInfo!['name'] ?? '-';
       final contact = _storeInfo!['kontak_toko'] ?? _storeInfo!['kontak'] ?? _storeInfo!['contact'] ?? '';
@@ -428,7 +392,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       );
     }
 
-    // else, try some common fields from _product
     final storeNameFromProduct = _product?['toko'] is String ? _product!['toko'] : (_product?['store'] is String ? _product!['store'] : null);
     final storeNameViaField = _product?['nama_toko'] ?? _product?['store_name'];
 
@@ -438,7 +401,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     } else if (storeNameViaField != null) {
       return Text('Toko: ${storeNameViaField}', style: const TextStyle(color: Colors.white70));
     } else if (storeId != null) {
-      return Text('Toko ID: $storeId', style: const TextStyle(color: Colors.white70)); // fallback: show id
+      return Text('Toko ID: $storeId', style: const TextStyle(color: Colors.white70));
     } else {
       return Text('-', style: const TextStyle(color: Colors.white70));
     }

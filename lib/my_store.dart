@@ -19,11 +19,11 @@ class _MyStorePageState extends State<MyStorePage> {
   final _waCtrl = TextEditingController();
   final _addressCtrl = TextEditingController();
 
-  bool _loading = true; // load existing store
+  bool _loading = true;
   bool _saving = false;
   File? _logoFile;
   String? _logoPreviewUrl;
-  int? _storeId; // jika edit, id toko akan diset
+  int? _storeId;
 
   @override
   void initState() {
@@ -83,7 +83,7 @@ class _MyStorePageState extends State<MyStorePage> {
       final logoUrl = (s['logo'] ?? s['gambar'] ?? s['image'])?.toString();
       setState(() {
         _logoPreviewUrl = (logoUrl != null && logoUrl.isNotEmpty) ? logoUrl : null;
-        _logoFile = null; // prefer network preview unless user picks new file
+        _logoFile = null;
       });
     }
   }
@@ -149,8 +149,8 @@ class _MyStorePageState extends State<MyStorePage> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         backgroundColor: Colors.black,
-        title: const Text('Hapus Toko', style: TextStyle(color: Colors.white),),
-        content: const Text('Apakah kamu yakin ingin menghapus toko ini?', style: TextStyle(color: Colors.white),),
+        title: const Text('Hapus Toko', style: TextStyle(color: Colors.white)),
+        content: const Text('Apakah kamu yakin ingin menghapus toko ini?', style: TextStyle(color: Colors.white)),
         actions: [
           Row(
             children: [
@@ -161,9 +161,7 @@ class _MyStorePageState extends State<MyStorePage> {
                     side: const BorderSide(color: Colors.white30),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                   child: const Text('Batal'),
                 ),
@@ -176,9 +174,7 @@ class _MyStorePageState extends State<MyStorePage> {
                     backgroundColor: Colors.redAccent,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                   child: const Text('Hapus'),
                 ),
@@ -308,9 +304,7 @@ class _MyStorePageState extends State<MyStorePage> {
                                           final chosen = await showModalBottomSheet<ImageSource>(
                                             context: context,
                                             backgroundColor: Colors.black,
-                                            shape: const RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-                                            ),
+                                            shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(12))),
                                             builder: (ctx) => SafeArea(
                                               child: Column(
                                                 mainAxisSize: MainAxisSize.min,
@@ -388,9 +382,7 @@ class _MyStorePageState extends State<MyStorePage> {
                                     ),
                                   ),
                                 ),
-
                                 const SizedBox(width: 12),
-
                                 if (_storeId != null)
                                   Expanded(
                                     child: OutlinedButton.icon(
