@@ -2,7 +2,6 @@
 import 'package:flutter/material.dart';
 import 'package:marketplacedesign/api_service.dart';
 import 'package:marketplacedesign/detail-product.dart';
-import 'package:marketplacedesign/login.dart';
 
 // Halaman utama (Home) yang menampilkan daftar produk dan kategori
 class HomePage extends StatefulWidget {
@@ -64,7 +63,13 @@ class _HomePageState extends State<HomePage> {
   Future<void> _loadProducts({int? categoryId, String? keyword}) async {
     setState(() => _loading = true);
     try {
-      final res = await _api.getProducts(page: 1, keyword: keyword ?? (_query.isEmpty ? null : _query), categoryId: categoryId);
+      // Jika endpoint memerlukan token, set auth: true. Default false.
+      final res = await _api.getProducts(
+        page: 1,
+        keyword: keyword ?? (_query.isEmpty ? null : _query),
+        categoryId: categoryId,
+        auth: false,
+      );
       if (res is Map && res.containsKey('data')) {
         _products = List.from(res['data']);
       } else if (res is List) {
@@ -92,15 +97,30 @@ class _HomePageState extends State<HomePage> {
     await _loadProducts(categoryId: id);
   }
 
-  // Local filtering sebagai fallback bila server tidak mendukung keyword
-  List<dynamic> _filteredProductsLocal() {
-    if (_query.trim().isEmpty) return _products;
-    final q = _query.toLowerCase();
-    return _products.where((p) {
-      final title = (p['nama_produk'] ?? p['title'] ?? '').toString().toLowerCase();
-      final desc = (p['deskripsi'] ?? p['description'] ?? '').toString().toLowerCase();
-      return title.contains(q) || desc.contains(q);
-    }).toList();
+  // Gabungan filter: kategori (client-side fallback) + search lokal
+  List<dynamic> _filteredProductsByCategoryAndSearch() {
+    List<dynamic> list = List.from(_products);
+
+    // Filter kategori lokal jika kategori dipilih
+    if (_selectedCategoryId != null) {
+      list = list.where((p) {
+        final catId = p['id_kategori'] ?? p['category_id'] ?? p['id_category'] ?? p['kategori_id'] ?? p['idCategory'];
+        if (catId == null) return false;
+        return catId.toString() == _selectedCategoryId.toString();
+      }).toList();
+    }
+
+    // Filter search lokal
+    if (_query.trim().isNotEmpty) {
+      final q = _query.toLowerCase();
+      list = list.where((p) {
+        final title = (p['nama_produk'] ?? p['title'] ?? '').toString().toLowerCase();
+        final desc = (p['deskripsi'] ?? p['description'] ?? '').toString().toLowerCase();
+        return title.contains(q) || desc.contains(q);
+      }).toList();
+    }
+
+    return list;
   }
 
   // Format harga sederhana ke format Rupiah (contoh: 1000000 -> Rp 1.000.000)
@@ -122,8 +142,8 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    // Gunakan hasil filter lokal sebagai daftar yang akan ditampilkan
-    final items = _filteredProductsLocal();
+    // Gunakan hasil filter (kategori + search) sebagai daftar yang akan ditampilkan
+    final items = _filteredProductsByCategoryAndSearch();
 
     return Scaffold(
       backgroundColor: Colors.black,

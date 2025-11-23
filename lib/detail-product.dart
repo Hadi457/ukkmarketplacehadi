@@ -1,7 +1,10 @@
-import 'dart:io';
+// Screenshot reference (for debugging): /mnt/data/fe947c4d-aa07-4f8a-a5b8-62357ebb60e1.png
+
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:marketplacedesign/api_service.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:url_launcher/url_launcher_string.dart';
 
 class ProductDetailPage extends StatefulWidget {
   final int productId;
@@ -16,6 +19,10 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
 
   bool _loading = true;
   Map<String, dynamic>? _product;
+
+  // tambahan: resolved category name & store info
+  String? _categoryName;
+  Map<String, dynamic>? _storeInfo;
 
   @override
   void initState() {
@@ -36,6 +43,78 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       } else {
         _product = null;
       }
+
+      // resolve category name
+      _categoryName = _extractCategoryName(_product);
+      if (_categoryName == null) {
+        final catId = _extractCategoryId(_product);
+        if (catId != null) {
+          try {
+            final cats = await _api.getCategories();
+            if (cats is Map && cats.containsKey('data')) {
+              final list = cats['data'] as List;
+              final match = list.cast<Map>().firstWhere(
+                (e) {
+                  final idVal = e['id'] ?? e['id_kategori'] ?? e['id_kat'];
+                  return idVal != null && idVal.toString() == catId.toString();
+                },
+                orElse: () => {},
+              );
+              if (match.isNotEmpty) {
+                _categoryName = (match['nama_kategori'] ?? match['name'] ?? match['kategori'])?.toString();
+              }
+            } else if (cats is List) {
+              final match = cats.cast<Map>().firstWhere(
+                (e) {
+                  final idVal = e['id'] ?? e['id_kategori'];
+                  return idVal != null && idVal.toString() == catId.toString();
+                },
+                orElse: () => {},
+              );
+              if (match.isNotEmpty) {
+                _categoryName = (match['nama_kategori'] ?? match['name'])?.toString();
+              }
+            }
+          } catch (_) {
+            // ignore, keep null
+          }
+        }
+      }
+
+      // resolve store info
+      _storeInfo = _extractStoreObject(_product);
+      if (_storeInfo == null) {
+        final storeId = _extractStoreId(_product);
+        if (storeId != null) {
+          try {
+            // WARNING: /stores may return only current user's stores (requires auth).
+            // If backend doesn't expose store by id, this may not find it.
+            final storesRes = await _api.getStores();
+            if (storesRes is Map && storesRes.containsKey('data')) {
+              final list = storesRes['data'] as List;
+              final match = list.cast<Map>().firstWhere(
+                (e) {
+                  final idVal = e['id'] ?? e['id_toko'] ?? e['id_store'];
+                  return idVal != null && idVal.toString() == storeId.toString();
+                },
+                orElse: () => {},
+              );
+              if (match.isNotEmpty) _storeInfo = Map<String, dynamic>.from(match);
+            } else if (storesRes is List) {
+              final match = storesRes.cast<Map>().firstWhere(
+                (e) {
+                  final idVal = e['id'] ?? e['id_toko'];
+                  return idVal != null && idVal.toString() == storeId.toString();
+                },
+                orElse: () => {},
+              );
+              if (match.isNotEmpty) _storeInfo = Map<String, dynamic>.from(match);
+            }
+          } catch (_) {
+            // ignore error (e.g., unauthorized), leave storeInfo null
+          }
+        }
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal memuat detail produk: $e')));
@@ -46,239 +125,133 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     }
   }
 
-  InputDecoration _inputDecoration(String label, {String? hint}) {
-    return InputDecoration(
-      labelText: label,
-      hintText: hint,
-      labelStyle: const TextStyle(color: Colors.white70),
-      hintStyle: const TextStyle(color: Colors.white38),
-      filled: true,
-      fillColor: Colors.white10,
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Colors.white24)),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Colors.white70, width: 1.5)),
-    );
+  // helper: try multiple field names for category name
+  String? _extractCategoryName(Map<String, dynamic>? p) {
+    if (p == null) return null;
+    final candidates = ['kategori', 'category', 'nama_kategori', 'category_name', 'kategori_nama'];
+    for (final k in candidates) {
+      final v = p[k];
+      if (v != null && v.toString().trim().isNotEmpty) return v.toString();
+    }
+    // maybe product has nested kategori object
+    final nested = p['kategori'] ?? p['category'];
+    if (nested is Map && (nested['nama'] != null || nested['name'] != null)) {
+      return (nested['nama'] ?? nested['name']).toString();
+    }
+    return null;
   }
 
-  Future<void> _showEditSheet() async {
-    if (_product == null) return;
+  dynamic _extractCategoryId(Map<String, dynamic>? p) {
+    if (p == null) return null;
+    final candidates = ['id_kategori', 'category_id', 'idCategory', 'id_kat', 'id_tipe'];
+    for (final k in candidates) {
+      final v = p[k];
+      if (v != null && v.toString().trim().isNotEmpty) return v;
+    }
+    // maybe nested
+    final nested = p['kategori'] ?? p['category'];
+    if (nested is Map && (nested['id'] != null)) return nested['id'];
+    return null;
+  }
 
-    final _formKey = GlobalKey<FormState>();
-    final nameCtr = TextEditingController(text: _product!['nama_produk'] ?? _product!['name'] ?? '');
-    final priceCtr = TextEditingController(text: (_product!['harga'] ?? _product!['price'] ?? '').toString());
-    final stokCtr = TextEditingController(text: (_product!['stok'] ?? _product!['stock'] ?? '').toString());
-    final descCtr = TextEditingController(text: _product!['deskripsi'] ?? _product!['description'] ?? '');
-    final katCtr = TextEditingController(text: (_product!['id_kategori'] ?? _product!['category_id'] ?? '').toString());
+  Map<String, dynamic>? _extractStoreObject(Map<String, dynamic>? p) {
+    if (p == null) return null;
+    final candidates = ['toko', 'store', 'seller', 'owner'];
+    for (final k in candidates) {
+      final v = p[k];
+      if (v is Map) return Map<String, dynamic>.from(v);
+    }
+    return null;
+  }
 
-    File? _imageFile;
-    String? _imagePreview = (_product!['gambar'] ?? _product!['image'] ?? _product!['url_image'])?.toString();
+  dynamic _extractStoreId(Map<String, dynamic>? p) {
+    if (p == null) return null;
+    final candidates = ['id_toko', 'store_id', 'id_store', 'toko_id', 'owner_id'];
+    for (final k in candidates) {
+      final v = p[k];
+      if (v != null && v.toString().trim().isNotEmpty) return v;
+    }
+    // maybe nested toko object with id
+    final nested = p['toko'] ?? p['store'];
+    if (nested is Map && nested['id'] != null) return nested['id'];
+    return null;
+  }
 
-    Future<void> _pickImage(ImageSource src) async {
-      try {
-        final picker = ImagePicker();
-        final x = await picker.pickImage(source: src, maxWidth: 1200, maxHeight: 1200, imageQuality: 80);
-        if (x != null) {
-          _imageFile = File(x.path);
-          // update preview inside sheet via stateful builder
-        }
-      } catch (e) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal memilih gambar: $e')));
+  // ---------- WhatsApp helpers ----------
+  /// Try to extract contact string from store object or product fields.
+  String? _getStoreContact() {
+    // check store object first
+    if (_storeInfo != null) {
+      final candidates = ['kontak_toko', 'kontak', 'contact', 'phone', 'telepon', 'no_hp', 'no_telp', 'hp'];
+      for (final k in candidates) {
+        final v = _storeInfo![k];
+        if (v != null && v.toString().trim().isNotEmpty) return v.toString();
       }
     }
-
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.black,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(12))),
-      builder: (ctx) {
-        bool _savingLocal = false;
-        return StatefulBuilder(builder: (ctx2, setStateSB) {
-          Future<void> _save() async {
-            if (!_formKey.currentState!.validate()) return;
-            setStateSB(() => _savingLocal = true);
-            final fields = <String, String>{
-              'nama_produk': nameCtr.text.trim(),
-              'harga': priceCtr.text.trim(),
-              'stok': stokCtr.text.trim(),
-              'deskripsi': descCtr.text.trim(),
-              'id_kategori': katCtr.text.trim(),
-              'id': widget.productId.toString(),
-            };
-            try {
-              if (_imageFile != null) {
-                await _api.saveProductMultipart(fields, imageFile: _imageFile);
-              } else {
-                await _api.saveProductJson(fields);
-              }
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Produk diperbarui')));
-                Navigator.pop(ctx);
-                await _loadDetail();
-              }
-            } catch (e) {
-              String msg = e.toString();
-              if (e is ApiException) msg = e.message;
-              if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal menyimpan: $msg')));
-            } finally {
-              setStateSB(() => _savingLocal = false);
-            }
-          }
-
-          return Padding(
-            padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-            child: SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(child: Text('Edit Produk', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white))),
-                        IconButton(icon: const Icon(Icons.close, color: Colors.white), onPressed: () => Navigator.pop(ctx)),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Form(
-                      key: _formKey,
-                      child: Column(
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 110,
-                                height: 110,
-                                decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(8)),
-                                child: _imageFile != null
-                                    ? ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.file(_imageFile!, fit: BoxFit.cover))
-                                    : (_imagePreview != null && _imagePreview.isNotEmpty
-                                        ? ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.network(_imagePreview!, fit: BoxFit.cover, errorBuilder: (_,__,___) => const Icon(Icons.image, color: Colors.white24)))
-                                        : const Icon(Icons.image, size: 48, color: Colors.white24)),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    TextFormField(controller: nameCtr, style: const TextStyle(color: Colors.white), decoration: _inputDecoration('Nama Produk'), validator: (v) => v == null || v.trim().isEmpty ? 'Masukkan nama' : null),
-                                    const SizedBox(height: 8),
-                                    Row(
-                                      children: [
-                                        ElevatedButton.icon(
-                                          onPressed: () async {
-                                            await _pickImage(ImageSource.gallery);
-                                            setStateSB(() {});
-                                          },
-                                          icon: const Icon(Icons.photo, color: Colors.black),
-                                          label: const Text('Pilih Gambar', style: TextStyle(color: Colors.black)),
-                                          style: ElevatedButton.styleFrom(backgroundColor: Colors.white),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        ElevatedButton.icon(
-                                          onPressed: () async {
-                                            await _pickImage(ImageSource.camera);
-                                            setStateSB(() {});
-                                          },
-                                          icon: const Icon(Icons.camera_alt, color: Colors.black),
-                                          label: const Text('Ambil', style: TextStyle(color: Colors.black)),
-                                          style: ElevatedButton.styleFrom(backgroundColor: Colors.white),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          TextFormField(controller: priceCtr, style: const TextStyle(color: Colors.white), decoration: _inputDecoration('Harga'), keyboardType: TextInputType.number),
-                          const SizedBox(height: 12),
-                          TextFormField(controller: stokCtr, style: const TextStyle(color: Colors.white), decoration: _inputDecoration('Stok'), keyboardType: TextInputType.number),
-                          const SizedBox(height: 12),
-                          TextFormField(controller: katCtr, style: const TextStyle(color: Colors.white), decoration: _inputDecoration('ID Kategori'), keyboardType: TextInputType.number),
-                          const SizedBox(height: 12),
-                          TextFormField(controller: descCtr, style: const TextStyle(color: Colors.white), decoration: _inputDecoration('Deskripsi'), minLines: 2, maxLines: 5),
-                          const SizedBox(height: 16),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: ElevatedButton.icon(
-                                  onPressed: _savingLocal ? null : _save,
-                                  icon: _savingLocal ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black)) : const Icon(Icons.save, color: Colors.black),
-                                  label: const Text('Simpan', style: TextStyle(color: Colors.black)),
-                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 14)),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              ElevatedButton.icon(
-                                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                                onPressed: () async {
-                                  // delete product
-                                  final confirm = await showDialog<bool>(
-                                    context: ctx2,
-                                    builder: (dialogCtx) => AlertDialog(
-                                      backgroundColor: Colors.black,
-                                      title: const Text('Hapus Produk', style: TextStyle(color: Colors.white)),
-                                      content: const Text('Yakin ingin menghapus produk ini?', style: TextStyle(color: Colors.white70)),
-                                      actions: [
-                                        TextButton(onPressed: () => Navigator.pop(dialogCtx, false), child: const Text('Batal')),
-                                        TextButton(onPressed: () => Navigator.pop(dialogCtx, true), child: const Text('Hapus', style: TextStyle(color: Colors.redAccent))),
-                                      ],
-                                    ),
-                                  );
-                                  if (confirm == true) {
-                                    try {
-                                      await _api.deleteProduct(widget.productId);
-                                      if (mounted) {
-                                        Navigator.pop(ctx); // close sheet
-                                        Navigator.pop(context); // close detail page
-                                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Produk dihapus')));
-                                      }
-                                    } catch (e) {
-                                      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal hapus: $e')));
-                                    }
-                                  }
-                                },
-                                icon: const Icon(Icons.delete),
-                                label: const Text('Hapus'),
-                              )
-                            ],
-                          )
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        });
-      },
-    );
+    // fallback to product-level fields
+    final candidatesProduct = ['kontak_toko', 'kontak', 'contact', 'phone', 'telepon', 'no_hp', 'no_telp', 'hp', 'contact_toko', 'contact_store'];
+    for (final k in candidatesProduct) {
+      final v = _product?[k];
+      if (v != null && v.toString().trim().isNotEmpty) return v.toString();
+    }
+    return null;
   }
 
-  Future<void> _confirmDeleteFromPage() async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: Colors.black,
-        title: const Text('Hapus Produk', style: TextStyle(color: Colors.white)),
-        content: const Text('Yakin ingin menghapus produk ini?', style: TextStyle(color: Colors.white70)),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Batal')),
-          TextButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Hapus', style: TextStyle(color: Colors.redAccent))),
-        ],
-      ),
-    );
-    if (ok == true) {
+  /// Clean phone for use in wa.me link. Returns digits only(without +).
+  /// Heuristics: remove non-digits, if starts with 0 replace with 62 (Indonesia).
+  String _cleanPhoneForWhatsapp(String raw) {
+    var digits = raw.replaceAll(RegExp(r'[^0-9+]'), '');
+    if (digits.startsWith('+')) digits = digits.substring(1);
+    digits = digits.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.startsWith('0')) digits = digits.replaceFirst(RegExp(r'^0+'), '62');
+    if (digits.length <= 9) digits = '62$digits';
+    return digits;
+  }
+
+  Future<void> _openWhatsApp(String rawPhone, {String? text}) async {
+    final cleaned = _cleanPhoneForWhatsapp(rawPhone);
+    if (cleaned.isEmpty) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Nomor WhatsApp tidak valid')));
+      return;
+    }
+
+    final encodedText = text == null ? null : Uri.encodeComponent(text);
+
+    // For web: always use wa.me (opens WhatsApp Web or prompt)
+    final waWeb = 'https://wa.me/$cleaned${encodedText != null ? '?text=$encodedText' : ''}';
+    final whatsappAppUri = Uri.parse('whatsapp://send?phone=$cleaned${encodedText != null ? '&text=$encodedText' : ''}');
+
+    // If running on web, open wa.me in new tab
+    if (kIsWeb) {
       try {
-        await _api.deleteProduct(widget.productId);
-        if (mounted) {
-          Navigator.pop(context); // close detail page
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Produk dihapus')));
+        final ok = await launchUrlString(waWeb, webOnlyWindowName: '_blank');
+        if (!ok) {
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Gagal membuka WhatsApp Web')));
         }
       } catch (e) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal hapus: $e')));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal membuka WhatsApp Web: $e')));
+      }
+      return;
+    }
+
+    // Mobile/Desktop: try app first then web fallback
+    try {
+      if (await canLaunchUrl(whatsappAppUri)) {
+        await launchUrl(whatsappAppUri, mode: LaunchMode.externalApplication);
+        return;
+      }
+
+      // fallback to wa.me web link
+      final ok = await launchUrlString(waWeb, mode: LaunchMode.externalApplication);
+      if (!ok) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tidak dapat membuka WhatsApp')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Gagal membuka WhatsApp: $e\nLink: $waWeb'),
+          duration: const Duration(seconds: 6),
+        ));
       }
     }
   }
@@ -289,22 +262,14 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     final title = _product == null ? '' : (_product!['nama_produk'] ?? _product!['name'] ?? '');
     final harga = _product == null ? '' : (_product!['harga'] ?? _product!['price'] ?? '');
 
+    final storeContact = _getStoreContact();
+
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
         backgroundColor: Colors.black,
         elevation: 0,
         title: const Text('Detail Produk', style: TextStyle(color: Colors.white)),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.edit, color: Colors.white),
-            onPressed: _product == null ? null : _showEditSheet,
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete, color: Colors.redAccent),
-            onPressed: _product == null ? null : _confirmDeleteFromPage,
-          ),
-        ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: Colors.white))
@@ -343,34 +308,140 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                     ),
                   ),
                   const SizedBox(height: 18),
-                  // meta info
+                  // meta info (stok, kategori, toko)
                   if (_product != null)
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Informasi', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600)),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            const Icon(Icons.layers, color: Colors.white38, size: 18),
-                            const SizedBox(width: 8),
-                            Text('Stok: ${_product!['stok'] ?? _product!['stock'] ?? '-'}', style: const TextStyle(color: Colors.white70)),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            const Icon(Icons.category, color: Colors.white38, size: 18),
-                            const SizedBox(width: 8),
-                            Text('Kategori: ${_product!['kategori'] ?? _product!['category'] ?? '-'}', style: const TextStyle(color: Colors.white70)),
-                          ],
-                        ),
-                      ],
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white10,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.white12),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Informasi',
+                            style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(height: 12),
+
+                          // Stok
+                          Row(
+                            children: [
+                              const Icon(Icons.layers, color: Colors.white38, size: 18),
+                              const SizedBox(width: 10),
+                              Text(
+                                'Stok: ${_product!['stok'] ?? _product!['stock'] ?? '-'}',
+                                style: const TextStyle(color: Colors.white70),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+
+                          // Kategori
+                          Row(
+                            children: [
+                              const Icon(Icons.category, color: Colors.white38, size: 18),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  'Kategori: ${_categoryName ?? (_product!['kategori'] ?? _product!['category'] ?? '-')}',
+                                  style: const TextStyle(color: Colors.white70),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+
+                          // Toko
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(Icons.store, color: Colors.white38, size: 18),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: _buildStoreWidget(),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+
+                          // Tombol WA saja
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: (storeContact != null && storeContact.trim().isNotEmpty)
+                                      ? () async {
+                                          final pesan = 'Halo, saya mau membeli produk: $title';
+                                          await _openWhatsApp(storeContact, text: pesan);
+                                        }
+                                      : null,
+                                  icon: const Icon(Icons.phone, color: Colors.white),
+                                  label: Text(
+                                    storeContact != null && storeContact.trim().isNotEmpty
+                                        ? 'Beli via WhatsApp'
+                                        : 'Kontak toko tidak tersedia',
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: storeContact != null && storeContact.trim().isNotEmpty
+                                        ? Colors.green
+                                        : Colors.white12,
+                                    padding: const EdgeInsets.symmetric(vertical: 14),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    elevation: 0,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 10),
+                          if (storeContact != null && storeContact.trim().isNotEmpty)
+                            Text(
+                              'Nomor toko: $storeContact',
+                              style: const TextStyle(color: Colors.white54, fontSize: 12),
+                            ),
+                        ],
+                      ),
                     ),
                 ],
               ),
             ),
     );
+  }
+  Widget _buildStoreWidget() {
+    // if we have full store object
+    if (_storeInfo != null && _storeInfo!.isNotEmpty) {
+      final name = _storeInfo!['nama_toko'] ?? _storeInfo!['nama'] ?? _storeInfo!['name'] ?? '-';
+      final contact = _storeInfo!['kontak_toko'] ?? _storeInfo!['kontak'] ?? _storeInfo!['contact'] ?? '';
+      final alamat = _storeInfo!['alamat'] ?? _storeInfo!['address'] ?? '';
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Toko: $name', style: const TextStyle(color: Colors.white70)),
+          if (contact.toString().trim().isNotEmpty) Text('Kontak: $contact', style: const TextStyle(color: Colors.white54, fontSize: 12)),
+          if (alamat.toString().trim().isNotEmpty) Text('Alamat: $alamat', style: const TextStyle(color: Colors.white54, fontSize: 12)),
+        ],
+      );
+    }
+
+    // else, try some common fields from _product
+    final storeNameFromProduct = _product?['toko'] is String ? _product!['toko'] : (_product?['store'] is String ? _product!['store'] : null);
+    final storeNameViaField = _product?['nama_toko'] ?? _product?['store_name'];
+
+    final storeId = _extractStoreId(_product);
+    if (storeNameFromProduct != null) {
+      return Text('Toko: ${storeNameFromProduct}', style: const TextStyle(color: Colors.white70));
+    } else if (storeNameViaField != null) {
+      return Text('Toko: ${storeNameViaField}', style: const TextStyle(color: Colors.white70));
+    } else if (storeId != null) {
+      return Text('Toko ID: $storeId', style: const TextStyle(color: Colors.white70)); // fallback: show id
+    } else {
+      return Text('-', style: const TextStyle(color: Colors.white70));
+    }
   }
 
   String _formatPrice(dynamic price) {

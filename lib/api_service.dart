@@ -50,6 +50,7 @@ class ApiService {
     final map = <String, String>{
       'Accept': 'application/json',
     };
+    // Set Content-Type only when sending JSON (POST/PUT)
     if (jsonType) {
       map['Content-Type'] = 'application/json';
     }
@@ -245,7 +246,7 @@ class ApiService {
   Future<dynamic> getProfile() async {
     final token = await getToken();
     final uri = Uri.parse('$baseUrl/profile');
-    final res = await _client.get(uri, headers: _defaultHeaders(token: token));
+    final res = await _client.get(uri, headers: _defaultHeaders(token: token, jsonType: false));
     return _handleResponse(res);
   }
 
@@ -273,34 +274,48 @@ class ApiService {
   // -------------------------
   Future<dynamic> getCategories() async {
     final uri = Uri.parse('$baseUrl/categories');
-    final res = await _client.get(uri, headers: _defaultHeaders(jsonType: true));
+    final res = await _client.get(uri, headers: _defaultHeaders(jsonType: false));
     return _handleResponse(res);
   }
 
   // -------------------------
   // PRODUCTS
   // -------------------------
-  /// Get products (with optional page, q params)
-  Future<dynamic> getProducts({int page = 1, String? keyword, int? categoryId}) async {
+  /// Get products (with optional page, keyword, categoryId)
+  /// - `auth`: set true if endpoint requires Authorization header
+  Future<dynamic> getProducts({int page = 1, String? keyword, int? categoryId, bool auth = false}) async {
     final params = <String, String>{'page': page.toString()};
     if (keyword != null && keyword.isNotEmpty) params['keyword'] = keyword;
-    if (categoryId != null) params['id_kategori'] = categoryId.toString();
+
+    if (categoryId != null) {
+      // primary param used by your previous code
+      params['id_kategori'] = categoryId.toString();
+      // include common variants for wider compatibility
+      params['category_id'] = categoryId.toString();
+      params['id_category'] = categoryId.toString();
+    }
+
+    final token = auth ? await getToken() : null;
     final uri = Uri.parse('$baseUrl/products').replace(queryParameters: params);
-    final res = await _client.get(uri, headers: _defaultHeaders());
+
+    debugPrint('getProducts -> GET $uri (auth: $auth, token present: ${token != null})');
+
+    // For GET requests, avoid Content-Type header
+    final res = await _client.get(uri, headers: _defaultHeaders(token: token, jsonType: false));
     return _handleResponse(res);
   }
 
   /// Get product detail
   Future<dynamic> getProductDetail(int id) async {
     final uri = Uri.parse('$baseUrl/products/$id/show');
-    final res = await _client.get(uri, headers: _defaultHeaders());
+    final res = await _client.get(uri, headers: _defaultHeaders(jsonType: false));
     return _handleResponse(res);
   }
 
   /// Search products (alternative endpoint)
   Future<dynamic> searchProducts(String keyword, {int page = 1}) async {
     final uri = Uri.parse('$baseUrl/products/search').replace(queryParameters: {'keyword': keyword, 'page': page.toString()});
-    final res = await _client.get(uri, headers: _defaultHeaders());
+    final res = await _client.get(uri, headers: _defaultHeaders(jsonType: false));
     return _handleResponse(res);
   }
 
@@ -313,7 +328,6 @@ class ApiService {
   }
 
   /// Save product - Multipart variant (if API expects upload fields + image)
-  /// fields: Map of fieldName -> value (strings). imageFile optional.
   Future<dynamic> saveProductMultipart(Map<String, String> fields, {File? imageFile}) async {
     final token = await getToken();
     final uri = Uri.parse('$baseUrl/products/save');
@@ -342,10 +356,10 @@ class ApiService {
   // -------------------------
   // PRODUCT IMAGES
   // -------------------------
-  /// List images for product
+  /// List images for product (GET)
   Future<dynamic> getProductImages(int idProduk) async {
     final uri = Uri.parse('$baseUrl/products/$idProduk/images');
-    final res = await _client.post(uri, headers: _defaultHeaders());
+    final res = await _client.get(uri, headers: _defaultHeaders(jsonType: false));
     return _handleResponse(res);
   }
 
@@ -384,7 +398,7 @@ class ApiService {
   Future<dynamic> getStores() async {
     final token = await getToken();
     final uri = Uri.parse('$baseUrl/stores');
-    final res = await _client.get(uri, headers: _defaultHeaders(token: token));
+    final res = await _client.get(uri, headers: _defaultHeaders(token: token, jsonType: false));
     return _handleResponse(res);
   }
 
@@ -453,7 +467,7 @@ class ApiService {
   Future<dynamic> getStoreProducts() async {
     final token = await getToken();
     final uri = Uri.parse('$baseUrl/stores/products');
-    final res = await _client.get(uri, headers: _defaultHeaders(token: token));
+    final res = await _client.get(uri, headers: _defaultHeaders(token: token, jsonType: false));
     return _handleResponse(res);
   }
 
@@ -464,7 +478,7 @@ class ApiService {
   Future<dynamic> get(String path, {Map<String, String>? params, bool auth = false}) async {
     final token = auth ? await getToken() : null;
     final uri = Uri.parse('$baseUrl$path').replace(queryParameters: params);
-    final res = await _client.get(uri, headers: _defaultHeaders(token: token));
+    final res = await _client.get(uri, headers: _defaultHeaders(token: token, jsonType: false));
     return _handleResponse(res);
   }
 
@@ -491,7 +505,7 @@ class ApiService {
     final api = ApiService();
     // Sesuaikan path jika backend-mu menggunakan path lain (mis. '/produk-toko' atau '/toko/produk')
     final uri = Uri.parse('$baseUrl/stores/products');
-    final res = await api._client.get(uri, headers: api._defaultHeaders(token: token));
+    final res = await api._client.get(uri, headers: api._defaultHeaders(token: token, jsonType: false));
     return api._handleResponse(res);
   }
 
