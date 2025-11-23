@@ -11,7 +11,7 @@ class MyStorePage extends StatefulWidget {
 }
 
 class _MyStorePageState extends State<MyStorePage> {
-  final ApiService _api = ApiService();
+  final ApiService _api = ApiService(); // instance untuk panggil API
 
   final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
@@ -19,16 +19,16 @@ class _MyStorePageState extends State<MyStorePage> {
   final _waCtrl = TextEditingController();
   final _addressCtrl = TextEditingController();
 
-  bool _loading = true;
-  bool _saving = false;
-  File? _logoFile;
-  String? _logoPreviewUrl;
-  int? _storeId;
+  bool _loading = true; // status saat memuat data toko
+  bool _saving = false; // status saat menyimpan/hapus
+  File? _logoFile; // file logo sementara sebelum upload
+  String? _logoPreviewUrl; // url logo dari server
+  int? _storeId; // id toko jika sudah ada
 
   @override
   void initState() {
     super.initState();
-    _loadStore();
+    _loadStore(); // muat data toko saat widget dibuat
   }
 
   @override
@@ -40,6 +40,7 @@ class _MyStorePageState extends State<MyStorePage> {
     super.dispose();
   }
 
+  // Ambil data toko dari API dan isi form
   Future<void> _loadStore() async {
     setState(() => _loading = true);
     try {
@@ -72,6 +73,7 @@ class _MyStorePageState extends State<MyStorePage> {
     }
   }
 
+  // Terapkan data toko ke field form
   void _applyStoreData(dynamic s) {
     if (s is Map) {
       final idVal = (s['id'] ?? s['id_toko'] ?? s['id_store']);
@@ -83,11 +85,12 @@ class _MyStorePageState extends State<MyStorePage> {
       final logoUrl = (s['logo'] ?? s['gambar'] ?? s['image'])?.toString();
       setState(() {
         _logoPreviewUrl = (logoUrl != null && logoUrl.isNotEmpty) ? logoUrl : null;
-        _logoFile = null;
+        _logoFile = null; // reset file lokal
       });
     }
   }
 
+  // Reset form kosong
   void _clearForm() {
     setState(() {
       _storeId = null;
@@ -100,6 +103,7 @@ class _MyStorePageState extends State<MyStorePage> {
     });
   }
 
+  // Pilih logo dari gallery atau kamera
   Future<void> _pickLogo(ImageSource source) async {
     try {
       final picker = ImagePicker();
@@ -107,7 +111,7 @@ class _MyStorePageState extends State<MyStorePage> {
       if (xfile != null) {
         setState(() {
           _logoFile = File(xfile.path);
-          _logoPreviewUrl = null;
+          _logoPreviewUrl = null; // tampilkan preview lokal
         });
       }
     } catch (e) {
@@ -115,6 +119,7 @@ class _MyStorePageState extends State<MyStorePage> {
     }
   }
 
+  // Simpan atau buat toko ke server (multipart kalau ada logo)
   Future<void> _saveStore() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -131,7 +136,7 @@ class _MyStorePageState extends State<MyStorePage> {
       await _api.saveStore(fields: fields, imageFile: _logoFile);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Toko berhasil disimpan')));
-        await _loadStore();
+        await _loadStore(); // refresh data setelah simpan
       }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal menyimpan toko: $e')));
@@ -140,6 +145,7 @@ class _MyStorePageState extends State<MyStorePage> {
     }
   }
 
+  // Konfirmasi sebelum menghapus toko
   Future<void> _confirmDelete() async {
     if (_storeId == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tidak ada toko untuk dihapus')));
@@ -187,6 +193,7 @@ class _MyStorePageState extends State<MyStorePage> {
     if (ok == true) await _deleteStore();
   }
 
+  // Hapus toko via API
   Future<void> _deleteStore() async {
     if (_storeId == null) return;
     setState(() => _saving = true);
@@ -203,6 +210,7 @@ class _MyStorePageState extends State<MyStorePage> {
     }
   }
 
+  // Widget preview logo (file lokal atau url)
   Widget _buildLogoPreview() {
     final double size = 110;
     if (_logoFile != null) {
@@ -236,6 +244,7 @@ class _MyStorePageState extends State<MyStorePage> {
     }
   }
 
+  // Dekorasi input agar konsisten
   InputDecoration _inputDecoration(String label, {String? hint, String? errorText, IconData? icon}) {
     return InputDecoration(
       labelText: label,

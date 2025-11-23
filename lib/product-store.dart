@@ -13,23 +13,24 @@ class TokoProdukPage extends StatefulWidget {
 }
 
 class _TokoProdukPageState extends State<TokoProdukPage> {
-  final ApiService _api = ApiService();
+  final ApiService _api = ApiService(); // instance API
 
-  bool loading = true;
-  bool refreshing = false;
-  List<dynamic> _products = [];
-  int page = 1;
-  int lastPage = 1;
+  bool loading = true; // status loading awal
+  bool refreshing = false; // status refresh list
+  List<dynamic> _products = []; // list produk
+  int page = 1; // halaman saat ini (jika pagination)
+  int lastPage = 1; // last page dari API
 
-  List<Map<String, dynamic>> _categories = [];
-  int? selectedCategoryId;
+  List<Map<String, dynamic>> _categories = []; // daftar kategori
+  int? selectedCategoryId; // kategori yang dipilih di form
 
   @override
   void initState() {
     super.initState();
-    _initData();
+    _initData(); // muat kategori + produk
   }
 
+  // Inisialisasi data: kategori + produk
   Future<void> _initData() async {
     setState(() => loading = true);
     try {
@@ -42,6 +43,7 @@ class _TokoProdukPageState extends State<TokoProdukPage> {
     }
   }
 
+  // Ambil kategori dari API dan normalisasi ke List<Map>
   Future<void> _loadCategories() async {
     try {
       final res = await _api.getCategories();
@@ -57,9 +59,12 @@ class _TokoProdukPageState extends State<TokoProdukPage> {
         cats = [Map<String, dynamic>.from(res)];
       }
       if (mounted) setState(() => _categories = cats);
-    } catch (e) {}
+    } catch (e) {
+      // silent fail — kategori opsional
+    }
   }
 
+  // Ambil produk toko. Backend kadang mengembalikan struktur berbeda, jadi ada banyak fallback
   Future<void> _loadProducts({int page = 1}) async {
     setState(() {
       if (page == 1) loading = true;
@@ -82,6 +87,7 @@ class _TokoProdukPageState extends State<TokoProdukPage> {
           items = List.from(data);
         }
 
+        // Coba ambil info pagination dari beberapa kemungkinan key
         final pagination = res['pagination'] ?? res['meta'] ?? (data is Map ? (data['pagination'] ?? data['meta']) : null);
         if (pagination is Map) {
           currentPage = (pagination['current_page'] is int) ? pagination['current_page'] : currentPage;
@@ -111,6 +117,7 @@ class _TokoProdukPageState extends State<TokoProdukPage> {
     }
   }
 
+  // Hapus produk setelah konfirmasi
   Future<void> _deleteProduct(int id) async {
     final ok = await showDialog<bool>(
       context: context,
@@ -172,6 +179,7 @@ class _TokoProdukPageState extends State<TokoProdukPage> {
     }
   }
 
+  // Tampilkan form untuk tambah / edit produk menggunakan modal bottom sheet
   Future<void> _showProductForm({Map<String, dynamic>? product}) async {
     final isEdit = product != null;
     final _formKey = GlobalKey<FormState>();
@@ -207,6 +215,7 @@ class _TokoProdukPageState extends State<TokoProdukPage> {
 
     bool _saving = false;
 
+    // Tampilkan bottom sheet dengan StatefulBuilder agar bisa setState lokal
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -367,7 +376,7 @@ class _TokoProdukPageState extends State<TokoProdukPage> {
                             decoration: _inputDecoration('Kategori'),
                             dropdownColor: Colors.black,
                             validator: (v) {
-                              return null;
+                              return null; // kategori opsional
                             },
                           ),
                           const SizedBox(height: 12),
@@ -406,6 +415,7 @@ class _TokoProdukPageState extends State<TokoProdukPage> {
     );
   }
 
+  // Buat widget item list produk
   Widget _buildProductItem(dynamic p) {
     final id = p['id'] ?? p['id_produk'] ?? p['id_product'];
     final name = p['nama_produk'] ?? p['name'] ?? '';
@@ -456,6 +466,7 @@ class _TokoProdukPageState extends State<TokoProdukPage> {
     );
   }
 
+  // Dekorasi input sederhana
   InputDecoration _inputDecoration(String label) {
     return InputDecoration(
       labelText: label,

@@ -10,23 +10,24 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  final ApiService _api = ApiService();
+  final ApiService _api = ApiService(); // instance API
 
   final _formKey = GlobalKey<FormState>();
   final _nameCtr = TextEditingController();
   final _usernameCtr = TextEditingController();
   final _contactCtr = TextEditingController();
 
-  bool _loading = true;
-  bool _saving = false;
+  bool _loading = true; // loading saat memuat data profil
+  bool _saving = false; // loading saat menyimpan
 
-  Map<String, String?> _fieldErrors = {};
+  Map<String, String?> _fieldErrors = {}; // simpan error per-field dari API
 
   @override
   void initState() {
     super.initState();
-    _loadProfile();
+    _loadProfile(); // muat profil saat widget diinisialisasi
 
+    // Hapus pesan error untuk field ketika user mulai mengedit
     _nameCtr.addListener(() {
       if (_fieldErrors.containsKey('nama')) setState(() => _fieldErrors.remove('nama'));
     });
@@ -51,6 +52,7 @@ class _ProfilePageState extends State<ProfilePage> {
     super.dispose();
   }
 
+  // Helper untuk membuat dekorasi input yang konsisten
   InputDecoration _inputDecoration(String label, IconData icon, {String? errorText}) {
     return InputDecoration(
       labelText: label,
@@ -74,6 +76,7 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
+  // Ambil data profil dari API dan apply ke form
   Future<void> _loadProfile() async {
     setState(() {
       _loading = true;
@@ -100,12 +103,14 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
+  // Isi controller dari data yang datang (support beberapa nama field)
   void _applyProfileData(Map<String, dynamic> data) {
     _nameCtr.text = (data['name'] ?? data['nama'] ?? data['nama_lengkap'] ?? '').toString();
     _usernameCtr.text = (data['username'] ?? data['user_name'] ?? '').toString();
     _contactCtr.text = (data['contact'] ?? data['no_hp'] ?? data['kontak'] ?? data['telepon'] ?? '').toString();
   }
 
+  // Simpan perubahan profil ke server
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
@@ -113,6 +118,7 @@ class _ProfilePageState extends State<ProfilePage> {
     final token = await _api.getToken();
     debugPrint('DEBUG: token before updateProfile -> $token');
 
+    // Jika token hilang, minta user login ulang
     if (token == null || token.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -135,7 +141,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profil berhasil diperbarui')));
-        await _loadProfile();
+        await _loadProfile(); // refresh data setelah simpan
       }
     } catch (e) {
       String message = 'Gagal memperbarui profil: $e';
@@ -156,7 +162,7 @@ class _ProfilePageState extends State<ProfilePage> {
             } catch (_) {
               mapped['error'] = e.errors.toString();
             }
-            setState(() => _fieldErrors = mapped);
+            setState(() => _fieldErrors = mapped); // tampilkan error per-field
           }
         }
       } catch (_) {}
@@ -166,6 +172,7 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
+  // Logout: konfirmasi lalu panggil API, fallback hapus token
   Future<void> _logout() async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -199,6 +206,7 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
+  // Avatar singkat berdasarkan inisial nama
   Widget _buildAvatar() {
     final name = _nameCtr.text.trim();
     final initials =

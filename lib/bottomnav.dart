@@ -5,11 +5,13 @@ import 'package:marketplacedesign/product-store.dart';
 import 'package:marketplacedesign/profile.dart';
 import 'package:marketplacedesign/api_service.dart';
 
+// Widget utama bottom navigation
 class BottomNav extends StatelessWidget {
   const BottomNav({super.key});
 
   @override
   Widget build(BuildContext context) {
+    // Langsung lempar ke HomeScreen yang punya state
     return const HomeScreen();
   }
 }
@@ -22,24 +24,25 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int _selectedIndex = 0;
-  String? _token;
-  bool _loadingToken = true;
+  int _selectedIndex = 0; // index tab aktif
+  String? _token; // token user kalau login
+  bool _loadingToken = true; // supaya tampil loading dulu
 
-  late List<Widget> _pages;
+  late List<Widget> _pages; // daftar halaman
 
   @override
   void initState() {
     super.initState();
 
+    // Default pages saat halaman pertama kali dibangun
     _pages = [
       const HomePage(),
-      const Center(child: CircularProgressIndicator()),
+      const Center(child: CircularProgressIndicator()), // nanti diganti saat token siap
       const MyStorePage(),
       const ProfilePage(),
     ];
 
-    _initToken();
+    _initToken(); // ambil token dari storage
   }
 
   Future<void> _initToken() async {
@@ -49,23 +52,31 @@ class _HomeScreenState extends State<HomeScreen> {
         _token = token;
         _loadingToken = false;
 
+        // Update page sesuai status login
         _pages = [
           const HomePage(),
+
+          // Jika user belum login
           if (token == null || token.isEmpty)
             const Center(
               child: Padding(
                 padding: EdgeInsets.all(16.0),
-                child: Text('Silakan login untuk melihat produk toko',
-                    textAlign: TextAlign.center),
+                child: Text(
+                  'Silakan login untuk melihat produk toko',
+                  textAlign: TextAlign.center,
+                ),
               ),
             )
           else
+            // Jika login, tampilkan halaman produk toko
             TokoProdukPage(token: token),
+
           const MyStorePage(),
           const ProfilePage(),
         ];
       });
     } catch (e) {
+      // Jika gagal ambil token
       setState(() {
         _loadingToken = false;
         _pages = [
@@ -78,6 +89,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  // Handler ketika bottom nav ditekan
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
@@ -86,7 +98,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final body = _pages[_selectedIndex];
+    final body = _pages[_selectedIndex]; // halaman sesuai tab aktif
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -95,7 +107,7 @@ class _HomeScreenState extends State<HomeScreen> {
         decoration: const BoxDecoration(
           color: Colors.black,
           border: Border(
-            top: BorderSide(color: Colors.white24, width: 1),
+            top: BorderSide(color: Colors.white24, width: 1), // garis tipis di atas navbar
           ),
         ),
         child: BottomNavigationBar(

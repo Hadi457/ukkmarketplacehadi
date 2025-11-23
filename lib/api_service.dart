@@ -1,4 +1,3 @@
-// lib/api_service.dart
 import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'dart:io';
@@ -6,16 +5,18 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path/path.dart';
 
+// Exception khusus untuk menangani error dari API
 class ApiException implements Exception {
   final String message;
   final int? statusCode;
-  final Map<String, List<String>>? errors; // per-field errors
+  final Map<String, List<String>>? errors;
   ApiException(this.message, [this.statusCode, this.errors]);
 
   @override
   String toString() {
+    // Kalau ada errors per-field, gabungkan agar mudah dibaca
     if (errors != null && errors!.isNotEmpty) {
-      final combined = errors!.entries.map((e) => '${e.key}: ${e.value.join(", ")}').join('\n');
+      final combined = errors!.entries.map((e) => '${e.key}: ${e.value.join(", ") }').join('\n');
       return 'ApiException: $message (code: $statusCode)\n$combined';
     }
     return 'ApiException: $message (code: $statusCode)';
@@ -23,45 +24,50 @@ class ApiException implements Exception {
 }
 
 class ApiService {
+  // URL dasar API — ganti kalau endpoint berubah
   static const String baseUrl = 'http://learncode.biz.id/api';
   final http.Client _client;
 
+  // Bisa inject http.Client untuk testing/mocking
   ApiService({http.Client? client}) : _client = client ?? http.Client();
 
-  // -------------------------
-  // Token storage (shared_preferences)
-  // -------------------------
+  // Simpan token ke SharedPreferences
   Future<void> saveToken(String token) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('api_token', token);
   }
 
+  // Ambil token dari local storage
   Future<String?> getToken() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('api_token');
   }
 
+  // Hapus token (mis. saat logout)
   Future<void> removeToken() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('api_token');
   }
 
+  // Header default untuk request
   Map<String, String> _defaultHeaders({String? token, bool jsonType = true}) {
     final map = <String, String>{
-      'Accept': 'application/json',
+      'Accept': 'application/json', // server mengembalikan JSON diharapkan
     };
-    // Set Content-Type only when sending JSON (POST/PUT)
     if (jsonType) {
-      map['Content-Type'] = 'application/json';
+      map['Content-Type'] = 'application/json'; // body dikirim JSON
     }
     if (token != null && token.isNotEmpty) {
-      map['Authorization'] = 'Bearer $token';
+      map['Authorization'] = 'Bearer $token'; // auth header jika ada token
     }
     return map;
   }
 
+  // Fungsi umum untuk menangani response HTTP
   dynamic _handleResponse(http.Response res) {
     final status = res.statusCode;
+
+    // Jika body kosong dan status OK, kembalikan null
     if (res.body.isEmpty) {
       if (status >= 200 && status < 300) return null;
       throw ApiException('Empty response body', status);
@@ -69,17 +75,18 @@ class ApiService {
 
     dynamic data;
     try {
-      data = json.decode(res.body);
+      data = json.decode(res.body); // coba parse JSON
     } catch (_) {
-      // If body is not JSON, return raw body on success, otherwise throw.
+      // Kalau bukan JSON tapi status OK, kembalikan raw body
       if (status >= 200 && status < 300) return res.body;
       throw ApiException('Invalid JSON response: ${res.body}', status);
     }
 
+    // Status sukses -> return data
     if (status >= 200 && status < 300) {
       return data;
     } else {
-      // try to extract message
+      // Status error -> buat pesan yang informatif
       String message = 'Request failed with status $status';
       if (data is Map && data.containsKey('message')) {
         message = data['message'].toString();
@@ -89,7 +96,7 @@ class ApiService {
         message = data;
       }
 
-      // Extract validation errors if available (422)
+      // Jika validation error 422, parsing error-field supaya bisa ditampilkan
       Map<String, List<String>>? parsedErrors;
       if (status == 422 && data is Map && data.containsKey('errors')) {
         try {
@@ -102,7 +109,7 @@ class ApiService {
             }
           });
         } catch (_) {
-          parsedErrors = null;
+          parsedErrors = null; // kalau parsing gagal, biarkan null
         }
       }
 
@@ -110,10 +117,7 @@ class ApiService {
     }
   }
 
-  // -------------------------
-  // AUTH
-  // -------------------------
-  /// Register — kirim sebagai form-data sesuai Postman (field: nama, username, password, kontak)
+  // Register user (multipart request karena server mungkin menerima file juga)
   Future<dynamic> register({
     required String name,
     required String username,
@@ -122,6 +126,8 @@ class ApiService {
   }) async {
     final uri = Uri.parse('$baseUrl/register');
     var request = http.MultipartRequest('POST', uri);
+
+    // Field sesuai nama yang diharapkan server
     request.fields['nama'] = name;
     request.fields['username'] = username;
     request.fields['password'] = password;
@@ -134,7 +140,7 @@ class ApiService {
     debugPrint('REGISTER -> status: ${response.statusCode}');
     debugPrint('REGISTER -> body: ${response.body}');
 
-    // If 422, parse "errors" into structured map and throw ApiException with errors
+    // Tangani 422 manual supaya bisa kembalikan detail validasi
     if (response.statusCode == 422) {
       try {
         final map = json.decode(response.body);
@@ -151,7 +157,6 @@ class ApiService {
         }
         throw ApiException(combined, 422, parsed);
       } catch (e) {
-        // fallback: return generic message if parsing failed
         throw ApiException('Validasi gagal (422) — tidak dapat parse detail.', 422, null);
       }
     }
@@ -159,15 +164,13 @@ class ApiService {
     return _handleResponse(response);
   }
 
-  /// Login -> biasanya mengembalikan token
+  // Login user
   Future<dynamic> login({
     required String username,
     required String password,
   }) async {
     final uri = Uri.parse('$baseUrl/login');
 
-    // Gunakan MultipartRequest seperti sebelumnya (sesuaikan bila server
-    // mengharapkan JSON instead)
     var request = http.MultipartRequest('POST', uri);
     request.fields['username'] = username;
     request.fields['password'] = password;
@@ -175,28 +178,23 @@ class ApiService {
     final streamed = await request.send();
     final response = await http.Response.fromStream(streamed);
 
-    // Debug: print status & body supaya mudah lihat struktur response saat dev
     debugPrint('LOGIN -> status: ${response.statusCode}');
     debugPrint('LOGIN -> body: ${response.body}');
 
-    // Jika server mengembalikan error HTML, _handleResponse akan melempar.
     final data = _handleResponse(response);
 
-    // Coba ekstrak token dari berbagai kemungkinan lokasi dan simpan.
+    // Mencari token di response dalam beberapa bentuk yang mungkin
     try {
       String? token;
 
       if (data is Map) {
-        // common variants
         if (data.containsKey('token') && data['token'] is String) token = data['token'] as String;
         else if (data.containsKey('access_token') && data['access_token'] is String) token = data['access_token'] as String;
-        // sometimes token is inside data.data or data.user etc.
         else if (data.containsKey('data')) {
           final d = data['data'];
           if (d is Map) {
             if (d.containsKey('token') && d['token'] is String) token = d['token'] as String;
             else if (d.containsKey('access_token') && d['access_token'] is String) token = d['access_token'] as String;
-            // nested further
             else if (d.containsKey('user') && d['user'] is Map) {
               final u = d['user'] as Map;
               if (u.containsKey('token') && u['token'] is String) token = u['token'] as String;
@@ -206,11 +204,11 @@ class ApiService {
         }
       }
 
+      // Kalau dapat token, simpan ke storage lokal
       if (token != null && token.isNotEmpty) {
         await saveToken(token);
         debugPrint('ApiService login -> saved token: $token');
       } else {
-        // jika tidak menemukan token, coba lihat apakah server sendiri menyimpan cookie/session
         debugPrint('ApiService login -> token not found in response. Response data: $data');
       }
     } catch (e) {
@@ -220,29 +218,27 @@ class ApiService {
     return data;
   }
 
-  /// Logout (calls API then clears local token).
+  // Logout: panggil endpoint lalu hapus token lokal
   Future<dynamic> logout() async {
     final token = await getToken();
     final uri = Uri.parse('$baseUrl/logout');
 
     try {
       final res = await _client.post(uri, headers: _defaultHeaders(token: token));
-      // debug
       debugPrint('LOGOUT -> status: ${res.statusCode}');
       debugPrint('LOGOUT -> body: ${res.body}');
-      // call handle (akan menghapus token lokal setelah sukses)
       final data = _handleResponse(res);
       await removeToken();
       return data;
     } catch (e) {
-      // Jika ada error network atau server mengembalikan non-JSON, tetap hapus token lokal
+      // Jika error panggil endpoint, tetap hapus token lokal supaya state konsisten
       debugPrint('LOGOUT -> error calling endpoint: $e. Removing local token anyway.');
       await removeToken();
       rethrow;
     }
   }
 
-  /// Get profile (requires token)
+  // Dapatkan profil user (butuh token)
   Future<dynamic> getProfile() async {
     final token = await getToken();
     final uri = Uri.parse('$baseUrl/profile');
@@ -250,7 +246,7 @@ class ApiService {
     return _handleResponse(res);
   }
 
-  /// Update profile (fields flexible)
+  // Update profil (kirim JSON)
   Future<dynamic> updateProfile(Map<String, dynamic> fields) async {
     final token = await getToken();
     debugPrint('updateProfile -> token: $token');
@@ -269,28 +265,21 @@ class ApiService {
     return _handleResponse(res);
   }
 
-  // -------------------------
-  // CATEGORIES
-  // -------------------------
+  // Ambil daftar kategori
   Future<dynamic> getCategories() async {
     final uri = Uri.parse('$baseUrl/categories');
     final res = await _client.get(uri, headers: _defaultHeaders(jsonType: false));
     return _handleResponse(res);
   }
 
-  // -------------------------
-  // PRODUCTS
-  // -------------------------
-  /// Get products (with optional page, keyword, categoryId)
-  /// - `auth`: set true if endpoint requires Authorization header
+  // Ambil daftar produk dengan beberapa parameter opsional
   Future<dynamic> getProducts({int page = 1, String? keyword, int? categoryId, bool auth = false}) async {
     final params = <String, String>{'page': page.toString()};
     if (keyword != null && keyword.isNotEmpty) params['keyword'] = keyword;
 
     if (categoryId != null) {
-      // primary param used by your previous code
+      // Menambahkan beberapa key karena backend kadang memakai nama berbeda
       params['id_kategori'] = categoryId.toString();
-      // include common variants for wider compatibility
       params['category_id'] = categoryId.toString();
       params['id_category'] = categoryId.toString();
     }
@@ -300,26 +289,25 @@ class ApiService {
 
     debugPrint('getProducts -> GET $uri (auth: $auth, token present: ${token != null})');
 
-    // For GET requests, avoid Content-Type header
     final res = await _client.get(uri, headers: _defaultHeaders(token: token, jsonType: false));
     return _handleResponse(res);
   }
 
-  /// Get product detail
+  // Ambil detail produk berdasarkan id
   Future<dynamic> getProductDetail(int id) async {
     final uri = Uri.parse('$baseUrl/products/$id/show');
     final res = await _client.get(uri, headers: _defaultHeaders(jsonType: false));
     return _handleResponse(res);
   }
 
-  /// Search products (alternative endpoint)
+  // Cari produk
   Future<dynamic> searchProducts(String keyword, {int page = 1}) async {
     final uri = Uri.parse('$baseUrl/products/search').replace(queryParameters: {'keyword': keyword, 'page': page.toString()});
     final res = await _client.get(uri, headers: _defaultHeaders(jsonType: false));
     return _handleResponse(res);
   }
 
-  /// Save product - JSON variant (if API accepts JSON)
+  // Simpan produk lewat JSON
   Future<dynamic> saveProductJson(Map<String, dynamic> body) async {
     final token = await getToken();
     final uri = Uri.parse('$baseUrl/products/save');
@@ -327,7 +315,7 @@ class ApiService {
     return _handleResponse(res);
   }
 
-  /// Save product - Multipart variant (if API expects upload fields + image)
+  // Simpan produk dengan multipart (untuk upload gambar)
   Future<dynamic> saveProductMultipart(Map<String, String> fields, {File? imageFile}) async {
     final token = await getToken();
     final uri = Uri.parse('$baseUrl/products/save');
@@ -345,7 +333,7 @@ class ApiService {
     return _handleResponse(response);
   }
 
-  /// Delete product
+  // Hapus produk
   Future<dynamic> deleteProduct(int id) async {
     final token = await getToken();
     final uri = Uri.parse('$baseUrl/products/$id/delete');
@@ -353,21 +341,18 @@ class ApiService {
     return _handleResponse(res);
   }
 
-  // -------------------------
-  // PRODUCT IMAGES
-  // -------------------------
-  /// List images for product (GET)
+  // Ambil gambar-gambar produk
   Future<dynamic> getProductImages(int idProduk) async {
     final uri = Uri.parse('$baseUrl/products/$idProduk/images');
     final res = await _client.get(uri, headers: _defaultHeaders(jsonType: false));
     return _handleResponse(res);
   }
 
-  /// Upload product image (multipart)
+  // Upload satu gambar untuk produk
   Future<dynamic> uploadProductImage({
     required int idProduk,
     required File file,
-    String fieldName = 'gambar', // field expected by API
+    String fieldName = 'gambar',
   }) async {
     final token = await getToken();
     final uri = Uri.parse('$baseUrl/products/images/upload');
@@ -383,7 +368,7 @@ class ApiService {
     return _handleResponse(response);
   }
 
-  /// Delete an image (if endpoint uses POST /products/images/{image_id})
+  // Hapus gambar produk
   Future<dynamic> deleteProductImage(int imageId) async {
     final token = await getToken();
     final uri = Uri.parse('$baseUrl/products/images/$imageId');
@@ -391,10 +376,7 @@ class ApiService {
     return _handleResponse(res);
   }
 
-  // -------------------------
-  // STORES / TOKO
-  // -------------------------
-  /// Get store(s) for the logged-in user
+  // Ambil semua toko
   Future<dynamic> getStores() async {
     final token = await getToken();
     final uri = Uri.parse('$baseUrl/stores');
@@ -402,14 +384,13 @@ class ApiService {
     return _handleResponse(res);
   }
 
-  /// Save store (multipart if ada gambar)
+  // Simpan toko (multipart, bisa upload gambar)
   Future<dynamic> saveStore({required Map<String, String> fields, File? imageFile}) async {
     final token = await getToken();
     final uri = Uri.parse('$baseUrl/stores/save');
 
     var request = http.MultipartRequest('POST', uri);
 
-    // jangan set Content-Type (MultipartRequest akan set boundary otomatis)
     request.headers['Accept'] = 'application/json';
     if (token != null && token.isNotEmpty) {
       request.headers['Authorization'] = 'Bearer $token';
@@ -427,19 +408,16 @@ class ApiService {
     final streamed = await request.send();
     final response = await http.Response.fromStream(streamed);
 
-    // DEBUG: log status dan awal body (batas 1200 char supaya tidak banjir)
+    // Preview body agar mudah debugging ketika terjadi masalah
     final bodyPreview = response.body.length > 1200 ? response.body.substring(0, 1200) + '... (truncated)' : response.body;
     print('saveStore -> status: ${response.statusCode}');
     print('saveStore -> bodyPreview: $bodyPreview');
 
-    // Cek content-type header; jika bukan json, berikan error informatif
     final contentType = response.headers['content-type'] ?? '';
     if (!contentType.contains('application/json')) {
-      // Kemungkinan HTML/redirect/error view
       throw ApiException('Server returned non-JSON response (status ${response.statusCode}). Response preview: $bodyPreview', response.statusCode);
     }
 
-    // Jika JSON, decode seperti biasa
     try {
       final data = json.decode(response.body);
       if (response.statusCode >= 200 && response.statusCode < 300) {
@@ -450,12 +428,11 @@ class ApiService {
         throw ApiException(message, response.statusCode);
       }
     } catch (e) {
-      // jika decode gagal
       throw ApiException('Invalid JSON from server: ${e.toString()}. Body preview: $bodyPreview', response.statusCode);
     }
   }
 
-  /// Delete store
+  // Hapus toko
   Future<dynamic> deleteStore(int id) async {
     final token = await getToken();
     final uri = Uri.parse('$baseUrl/stores/$id/delete');
@@ -463,7 +440,7 @@ class ApiService {
     return _handleResponse(res);
   }
 
-  /// Get products of the logged-in user's store
+  // Ambil produk yang terkait dengan toko
   Future<dynamic> getStoreProducts() async {
     final token = await getToken();
     final uri = Uri.parse('$baseUrl/stores/products');
@@ -471,10 +448,7 @@ class ApiService {
     return _handleResponse(res);
   }
 
-  // -------------------------
-  // OTHER / UTILITIES
-  // -------------------------
-  /// Generic GET helper (optionally with query params)
+  // Generic GET helper
   Future<dynamic> get(String path, {Map<String, String>? params, bool auth = false}) async {
     final token = auth ? await getToken() : null;
     final uri = Uri.parse('$baseUrl$path').replace(queryParameters: params);
@@ -482,7 +456,7 @@ class ApiService {
     return _handleResponse(res);
   }
 
-  /// Generic POST helper (JSON body)
+  // Generic POST helper
   Future<dynamic> post(String path, Map<String, dynamic> body, {bool auth = false}) async {
     final token = auth ? await getToken() : null;
     final uri = Uri.parse('$baseUrl$path');
@@ -490,30 +464,22 @@ class ApiService {
     return _handleResponse(res);
   }
 
-  /// Close HTTP client (call on dispose if needed)
+  // Tutup client HTTP saat tidak dipakai
   void dispose() {
     _client.close();
   }
 
-  // -------------------------
-  // Compatibility static helpers (so UI can call ApiService.getProdukToko(token) etc.)
-  // -------------------------
-
-  /// Static wrapper agar kode lama yang memanggil ApiService.getProdukToko(token)
-  /// tetap bekerja. Memanggil endpoint yang sama dengan getStoreProducts()
+  // Helper statis: ambil produk toko dengan token yang diberikan
   static Future<dynamic> getProdukToko(String token) async {
     final api = ApiService();
-    // Sesuaikan path jika backend-mu menggunakan path lain (mis. '/produk-toko' atau '/toko/produk')
     final uri = Uri.parse('$baseUrl/stores/products');
     final res = await api._client.get(uri, headers: api._defaultHeaders(token: token, jsonType: false));
     return api._handleResponse(res);
   }
 
-  /// Static wrapper agar UI lama bisa memanggil ApiService.hapusProduk(token, id)
-  /// Memanggil endpoint delete/post sesuai implementasi yang ada.
+  // Helper statis: hapus produk dengan token yang diberikan
   static Future<dynamic> hapusProduk(String token, int idProduk) async {
     final api = ApiService();
-    // Jika backend-mu memakai DELETE, ubah ke api._client.delete(...)
     final uri = Uri.parse('$baseUrl/products/$idProduk/delete');
     final res = await api._client.post(uri, headers: api._defaultHeaders(token: token));
     return api._handleResponse(res);

@@ -13,8 +13,8 @@ class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
   final _usernameCtr = TextEditingController();
   final _passwordCtr = TextEditingController();
-  bool _loading = false;
-  final ApiService _api = ApiService();
+  bool _loading = false; // status loading saat login
+  final ApiService _api = ApiService(); // instance untuk panggil API
 
   @override
   void dispose() {
@@ -23,6 +23,7 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
+  // Fungsi login: validasi form -> panggil API -> simpan token
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
@@ -35,6 +36,7 @@ class _LoginPageState extends State<LoginPage> {
 
       debugPrint('LOGIN response: $res');
 
+      // Coba ekstrak token dari berbagai struktur response yang mungkin
       String? token;
       try {
         if (res is Map) {
@@ -56,10 +58,12 @@ class _LoginPageState extends State<LoginPage> {
         debugPrint('Token extract error: $e');
       }
 
+      // Simpan token ke SharedPreferences kalau ada
       if (token != null && token.isNotEmpty) {
         await _api.saveToken(token);
         debugPrint('Token disimpan dari login(): $token');
       } else {
+        // Jika token tidak ditemukan dari response, cek apakah sudah tersimpan oleh ApiService
         final saved = await _api.getToken();
         debugPrint('Token setelah login (shared prefs): $saved');
         if (saved == null || saved.isEmpty) {
@@ -70,6 +74,7 @@ class _LoginPageState extends State<LoginPage> {
         }
       }
 
+      // Tampilkan pesan sukses dan pindah halaman
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Login berhasil')));
         Navigator.pushReplacementNamed(context, '/home');
@@ -83,6 +88,7 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  // Dekorasi input field agar konsisten
   InputDecoration _inputDecoration(String label, IconData icon) {
     return InputDecoration(
       labelText: label,
@@ -125,6 +131,7 @@ class _LoginPageState extends State<LoginPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  // Header aplikasi
                   Container(
                     height: 92,
                     decoration: BoxDecoration(
@@ -146,6 +153,8 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
                   const SizedBox(height: 28),
+
+                  // Form login
                   Container(
                     padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
@@ -172,6 +181,8 @@ class _LoginPageState extends State<LoginPage> {
                             validator: (v) => v == null || v.isEmpty ? 'Masukkan password' : null,
                           ),
                           const SizedBox(height: 18),
+
+                          // Tombol login (disabled saat loading)
                           SizedBox(
                             width: double.infinity,
                             height: 50,
@@ -190,6 +201,8 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                           ),
                           const SizedBox(height: 12),
+
+                          // Link ke halaman register
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [

@@ -13,7 +13,7 @@ class ProductDetailPage extends StatefulWidget {
 }
 
 class _ProductDetailPageState extends State<ProductDetailPage> {
-  final ApiService _api = ApiService();
+  final ApiService _api = ApiService(); // instance API service
 
   bool _loading = true;
   Map<String, dynamic>? _product;
@@ -24,13 +24,16 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   @override
   void initState() {
     super.initState();
-    _loadDetail();
+    _loadDetail(); // muat detail saat widget dibuat
   }
 
+  // Ambil detail produk, kategori, dan info toko jika perlu
   Future<void> _loadDetail() async {
     setState(() => _loading = true);
     try {
       final res = await _api.getProductDetail(widget.productId);
+
+      // Normalisasi response ke Map produk jika memungkinkan
       if (res == null) {
         _product = null;
       } else if (res is Map && res.containsKey('data')) {
@@ -41,8 +44,10 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         _product = null;
       }
 
+      // Coba ambil nama kategori langsung dari produk
       _categoryName = _extractCategoryName(_product);
       if (_categoryName == null) {
+        // Jika belum ada, cari ID kategori lalu ambil daftar kategori dari API
         final catId = _extractCategoryId(_product);
         if (catId != null) {
           try {
@@ -75,8 +80,10 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         }
       }
 
+      // Coba ambil objek toko dari product
       _storeInfo = _extractStoreObject(_product);
       if (_storeInfo == null) {
+        // kalau tidak ada objek toko, ambil id toko lalu cari di daftar toko
         final storeId = _extractStoreId(_product);
         if (storeId != null) {
           try {
@@ -106,6 +113,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       }
     } catch (e) {
       if (mounted) {
+        // Tampilkan pesan error jika gagal
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal memuat detail produk: $e')));
       }
       _product = null;
@@ -114,6 +122,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     }
   }
 
+  // Beberapa helper untuk mengekstrak field yang mungkin berbeda nama di backend
   String? _extractCategoryName(Map<String, dynamic>? p) {
     if (p == null) return null;
     final candidates = ['kategori', 'category', 'nama_kategori', 'category_name', 'kategori_nama'];
@@ -162,6 +171,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     return null;
   }
 
+  // Ambil nomor kontak dari objek toko atau dari field produk
   String? _getStoreContact() {
     if (_storeInfo != null) {
       final candidates = ['kontak_toko', 'kontak', 'contact', 'phone', 'telepon', 'no_hp', 'no_telp', 'hp'];
@@ -178,15 +188,17 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     return null;
   }
 
+  // Bersihkan nomor telepon supaya sesuai format WhatsApp international
   String _cleanPhoneForWhatsapp(String raw) {
     var digits = raw.replaceAll(RegExp(r'[^0-9+]'), '');
     if (digits.startsWith('+')) digits = digits.substring(1);
     digits = digits.replaceAll(RegExp(r'[^0-9]'), '');
-    if (digits.startsWith('0')) digits = digits.replaceFirst(RegExp(r'^0+'), '62');
-    if (digits.length <= 9) digits = '62$digits';
+    if (digits.startsWith('0')) digits = digits.replaceFirst(RegExp(r'^0+'), '62'); // ganti 0... -> 62 (Indonesia)
+    if (digits.length <= 9) digits = '62$digits'; // fallback
     return digits;
   }
 
+  // Buka WhatsApp (app atau web) dengan nomor dan pesan (opsional)
   Future<void> _openWhatsApp(String rawPhone, {String? text}) async {
     final cleaned = _cleanPhoneForWhatsapp(rawPhone);
     if (cleaned.isEmpty) {
@@ -212,11 +224,13 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     }
 
     try {
+      // Coba buka aplikasi WhatsApp dulu
       if (await canLaunchUrl(whatsappAppUri)) {
         await launchUrl(whatsappAppUri, mode: LaunchMode.externalApplication);
         return;
       }
 
+      // Kalau tidak, buka WhatsApp web
       final ok = await launchUrlString(waWeb, mode: LaunchMode.externalApplication);
       if (!ok) {
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tidak dapat membuka WhatsApp')));
@@ -253,6 +267,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  // Gambar produk (jika ada)
                   if (imageUrl != null && imageUrl.isNotEmpty)
                     ClipRRect(
                       borderRadius: BorderRadius.circular(12),
@@ -261,10 +276,14 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                   else
                     Container(height: 260, decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.image, size: 72, color: Colors.white24)),
                   const SizedBox(height: 12),
+
+                  // Judul dan harga
                   Text(title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
                   const SizedBox(height: 8),
                   Text('Harga: ${_formatPrice(harga)}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white70)),
                   const SizedBox(height: 12),
+
+                  // Deskripsi
                   Container(
                     decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.white12)),
                     padding: const EdgeInsets.all(12),
@@ -283,6 +302,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                     ),
                   ),
                   const SizedBox(height: 18),
+
+                  // Informasi tambahan (stok, kategori, toko, tombol WA)
                   if (_product != null)
                     Container(
                       padding: const EdgeInsets.all(14),
@@ -377,6 +398,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
             ),
     );
   }
+
+  // Tampilkan info toko berdasarkan beberapa field kemungkinan
   Widget _buildStoreWidget() {
     if (_storeInfo != null && _storeInfo!.isNotEmpty) {
       final name = _storeInfo!['nama_toko'] ?? _storeInfo!['nama'] ?? _storeInfo!['name'] ?? '-';
@@ -407,6 +430,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     }
   }
 
+  // Format harga sederhana ke format Rupiah
   String _formatPrice(dynamic price) {
     try {
       if (price == null) return '';

@@ -10,8 +10,8 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  final ApiService _api = ApiService();
-  bool _loading = true;
+  final ApiService _api = ApiService(); // instance ApiService
+  bool _loading = true; // status loading
   List<dynamic> _products = [];
   List<dynamic> _categories = [];
   String _query = '';
@@ -20,9 +20,10 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    _loadCategoriesAndProducts();
+    _loadCategoriesAndProducts(); // muat kategori + produk saat mulai
   }
 
+  // Ambil kategori lalu produk
   Future<void> _loadCategoriesAndProducts() async {
     setState(() => _loading = true);
     try {
@@ -47,6 +48,7 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  // Ambil produk dari API, mendukung filter kategori & keyword
   Future<void> _loadProducts({int? categoryId, String? keyword}) async {
     setState(() => _loading = true);
     try {
@@ -75,6 +77,7 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  // Saat memilih kategori
   Future<void> _onSelectCategory(int? id) async {
     setState(() {
       _selectedCategoryId = id;
@@ -82,6 +85,7 @@ class _HomePageState extends State<HomePage> {
     await _loadProducts(categoryId: id);
   }
 
+  // Filter produk berdasarkan kategori dan pencarian lokal (fallback)
   List<dynamic> _filteredProductsByCategoryAndSearch() {
     List<dynamic> list = List.from(_products);
 
@@ -105,6 +109,7 @@ class _HomePageState extends State<HomePage> {
     return list;
   }
 
+  // Format harga sederhana ke Rupiah
   String _formatPrice(dynamic price) {
     try {
       if (price == null) return '';
@@ -160,7 +165,7 @@ class _HomePageState extends State<HomePage> {
                           ),
                           onChanged: (v) {
                             setState(() => _query = v);
-                            _loadProducts(categoryId: _selectedCategoryId);
+                            _loadProducts(categoryId: _selectedCategoryId); // langsung load ulang ke server
                           },
                         ),
                       ),
@@ -364,6 +369,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  // Widget chip kategori sederhana
   Widget _buildCategoryChip(dynamic idVal, String label) {
     final int? id = idVal == null ? null : (int.tryParse(idVal.toString()) ?? null);
     final selected = _selectedCategoryId == id;

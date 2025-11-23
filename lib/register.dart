@@ -9,19 +9,26 @@ class RegisterPage extends StatefulWidget {
 }
 
 class _RegisterPageState extends State<RegisterPage> {
+  // Key form untuk validasi
   final _formKey = GlobalKey<FormState>();
+
+  // Controller untuk tiap input
   final _nameCtr = TextEditingController();
   final _usernameCtr = TextEditingController();
   final _passwordCtr = TextEditingController();
   final _contactCtr = TextEditingController();
-  bool _loading = false;
-  final ApiService _api = ApiService();
 
+  bool _loading = false; // status loading saat register diproses
+  final ApiService _api = ApiService(); // instance service API
+
+  // Menyimpan error per-field dari response server (jika ada)
   Map<String, String?> _fieldErrors = {};
 
   @override
   void initState() {
     super.initState();
+
+    // Hapus error terkait field ketika user mulai mengetik ulang
     _nameCtr.addListener(() {
       if (_fieldErrors.containsKey('nama')) setState(() => _fieldErrors.remove('nama'));
     });
@@ -43,6 +50,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
   @override
   void dispose() {
+    // Bebaskan resource controller saat widget di-dispose
     _nameCtr.dispose();
     _usernameCtr.dispose();
     _passwordCtr.dispose();
@@ -50,6 +58,7 @@ class _RegisterPageState extends State<RegisterPage> {
     super.dispose();
   }
 
+  // Dekorasi input yang dipakai berulang
   InputDecoration _inputDecoration(String label, IconData icon, {String? errorText}) {
     return InputDecoration(
       labelText: label,
@@ -73,10 +82,11 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 
+  // Fungsi register: validasi form -> panggil API -> tangani error
   Future<void> _register() async {
-    setState(() => _fieldErrors.clear());
+    setState(() => _fieldErrors.clear()); // reset error sebelumnya
 
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) return; // validasi local
     setState(() => _loading = true);
     try {
       await _api.register(
@@ -87,15 +97,17 @@ class _RegisterPageState extends State<RegisterPage> {
       );
 
       if (mounted) {
+        // Berhasil: beri notifikasi dan kembali ke halaman login
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Registrasi berhasil. Silakan login.')));
         Navigator.pop(context);
       }
     } catch (e) {
+      // Tangani error: tampilkan pesan dan peta error per-field (jika ada)
       String message = 'Register error: $e';
 
       if (e is ApiException) {
         if (e.message != null && e.message.isNotEmpty) {
-          message = e.message;
+          message = e.message; // gunakan pesan yang dikirim server jika ada
         }
 
         if (e.errors != null) {
@@ -110,6 +122,7 @@ class _RegisterPageState extends State<RegisterPage> {
               }
             });
           } catch (_) {
+            // fallback jika struktur error tidak terduga
             try {
               mapped.addAll({'error': e.errors.toString()});
             } catch (_) {}
@@ -119,6 +132,7 @@ class _RegisterPageState extends State<RegisterPage> {
       }
 
       if (mounted) {
+        // Tampilkan dialog berisi pesan error
         showDialog(
           context: context,
           builder: (_) => AlertDialog(
@@ -154,6 +168,7 @@ class _RegisterPageState extends State<RegisterPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  // Header sederhana
                   Container(
                     height: 84,
                     decoration: BoxDecoration(
@@ -172,6 +187,8 @@ class _RegisterPageState extends State<RegisterPage> {
                     ),
                   ),
                   const SizedBox(height: 22),
+
+                  // Form utama
                   Container(
                     padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
@@ -220,6 +237,8 @@ class _RegisterPageState extends State<RegisterPage> {
                             keyboardType: TextInputType.phone,
                           ),
                           const SizedBox(height: 18),
+
+                          // Tombol submit
                           SizedBox(
                             width: double.infinity,
                             height: 48,
