@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:marketplacedesign/api_service.dart';
+import 'package:marketplacedesign/login.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -153,12 +154,6 @@ class _RegisterPageState extends State<RegisterPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      appBar: AppBar(
-        backgroundColor: Colors.black,
-        elevation: 0,
-        title: const Text('Register', style: TextStyle(color: Colors.white)),
-        centerTitle: true,
-      ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -261,7 +256,20 @@ class _RegisterPageState extends State<RegisterPage> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  const Center(child: Text('Isi data untuk membuat akun', style: TextStyle(color: Colors.white54))),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text("Sudah punya akun?", style: TextStyle(color: Colors.white70)),
+                      TextButton(
+                        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => LoginPage())),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          textStyle: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        child: const Text('Login', style: TextStyle(decoration: TextDecoration.underline)),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),

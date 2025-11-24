@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:marketplacedesign/bottomnav.dart';
 import 'package:marketplacedesign/login.dart';
 import 'package:marketplacedesign/register.dart';
+import 'package:marketplacedesign/splashscreen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -31,11 +32,10 @@ class MyApp extends StatelessWidget {
           builder: (context) => const LoginPage(),
         );
       },
-      title: 'Marketplace Demo',
+      title: 'Marketplace',
       theme: ThemeData(
-        primarySwatch: Colors.teal, // tema utama
       ),
-      home: const LaunchPage(), // halaman awal
+      home: const SplashScreen(), // halaman awal
     );
   }
 }

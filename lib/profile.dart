@@ -176,12 +176,52 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> _logout() async {
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Konfirmasi Logout'),
-        content: const Text('Yakin ingin keluar dari akun ini?'),
+      // builder: (_) => AlertDialog(
+      //   title: const Text('Konfirmasi Logout'),
+      //   content: const Text('Yakin ingin keluar dari akun ini?'),
+      //   actions: [
+      //     TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Batal')),
+      //     TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Keluar')),
+      //   ],
+      // ),
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: Colors.black,
+        title: const Text('Konfirmasi Logout', style: TextStyle(color: Colors.white)),
+        content: const Text('Yakin ingin keluar?', style: TextStyle(color: Colors.white70)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Batal')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Keluar')),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.white30),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: const Text('Batal'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.redAccent,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: const Text('Keluar'),
+                ),
+              ),
+            ],
+          )
         ],
       ),
     );
